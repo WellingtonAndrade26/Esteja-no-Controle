@@ -364,22 +364,3 @@ button:hover {
   }
 } 
 
-.btn-instalar {
-  margin-bottom: 14px;
-  background: linear-gradient(135deg, #d66cca, #f119bb);
-  color: white;
-  border: none;
-  border-radius: 16px;
-  padding: 13px;
-  font-weight: bold;
-  font-size: 15px;
-  box-shadow: 0 8px 18px rgba(34, 197, 94, 0.25);
-}
-
-.btn-instalar:hover {
-  opacity: 0.92;
-}
-
-.escondido {
-  display: none;
-}

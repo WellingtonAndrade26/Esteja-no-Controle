@@ -271,50 +271,6 @@ mesSelecionadoInput.addEventListener("change", function () {
   atualizarDashboardCategorias();
 });
 
-let eventoInstalacao = null;
-
-const btnInstallApp = document.getElementById("btnInstallApp");
-
-function estaNoModoApp() {
-  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
-}
-
-window.addEventListener("beforeinstallprompt", function (event) {
-  event.preventDefault();
-
-  eventoInstalacao = event;
-
-  if (!estaNoModoApp()) {
-    btnInstallApp.classList.remove("escondido");
-  }
-});
-
-btnInstallApp.addEventListener("click", async function () {
-  if (!eventoInstalacao) {
-    alert("Abra o menu do navegador e toque em 'Adicionar à tela inicial'.");
-    return;
-  }
-
-  eventoInstalacao.prompt();
-
-  const escolha = await eventoInstalacao.userChoice;
-
-  if (escolha.outcome === "accepted") {
-    btnInstallApp.classList.add("escondido");
-  }
-
-  eventoInstalacao = null;
-});
-
-window.addEventListener("appinstalled", function () {
-  btnInstallApp.classList.add("escondido");
-});
-
-window.addEventListener("load", function () {
-  if (estaNoModoApp()) {
-    btnInstallApp.classList.add("escondido");
-  }
-});
 
 mostrarGastos();
 atualizarTotal();
