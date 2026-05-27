@@ -1,4 +1,4 @@
-const CACHE_NAME = "controle-da-leticia-v4";
+const CACHE_NAME = "controle-da-leticia-v5";
 
 const ARQUIVOS = [
   "./",
@@ -6,9 +6,10 @@ const ARQUIVOS = [
   "./style.css",
   "./script.js",
   "./manifest.json",
-  "./imagens/banner-topo.png",
-  "./imagens/icon-192.png",
-  "./imagens/icon-512.png"
+  "./service-worker.js",
+  "./images/Logo-leticia.png",
+  "./images/icon-192.png",
+  "./images/icon-512.png"
 ];
 
 self.addEventListener("install", function (event) {
