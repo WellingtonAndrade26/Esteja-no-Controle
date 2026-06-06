@@ -2,33 +2,33 @@
   "name": "Controle da Letícia",
   "short_name": "Controle",
   "description": "App para controle de gastos mensais.",
-  "start_url": "/Controle-da-Leticia/",
-  "scope": "/Controle-da-Leticia/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#fdf2f8",
   "theme_color": "#ec4899",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/Controle-da-Leticia/images/icon-192.png",
+      "src": "./images/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/Controle-da-Leticia/images/icon-192.png",
+      "src": "./images/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/Controle-da-Leticia/images/icon-512.png",
+      "src": "./images/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/Controle-da-Leticia/images/icon-512.png",
+      "src": "./images/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

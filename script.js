@@ -1,3 +1,5 @@
+const API_BASE_URL = "https://controle-gastos-api-ruby.vercel.app";
+
 const formGasto = document.getElementById("formGasto");
 const descricaoInput = document.getElementById("descricao");
 const valorInput = document.getElementById("valor");
@@ -16,18 +18,20 @@ const textoSaldo = document.getElementById("textoSaldo");
 const saldoBox = document.querySelector(".saldo-box");
 const dashboardCategorias = document.getElementById("dashboardCategorias");
 
-let gastos = JSON.parse(localStorage.getItem("gastos")) || [];
+let gastos = [];
 
+// Por enquanto o orçamento continua local.
+// Depois fazemos ele online também.
 let orcamentos = JSON.parse(localStorage.getItem("orcamentos")) || {};
+
 let mesSelecionado = new Date().toISOString().slice(0, 7);
 let orcamento = Number(orcamentos[mesSelecionado]) || 0;
 
 mesSelecionadoInput.value = mesSelecionado;
-
 dataInput.value = new Date().toISOString().split("T")[0];
 
 function formatarMoeda(valor) {
-  return valor.toLocaleString("pt-BR", {
+  return Number(valor || 0).toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL"
   });
@@ -38,8 +42,66 @@ function formatarData(data) {
   return `${partes[2]}/${partes[1]}/${partes[0]}`;
 }
 
-function salvarNoLocalStorage() {
-  localStorage.setItem("gastos", JSON.stringify(gastos));
+async function buscarGastosOnline() {
+  try {
+    const resposta = await fetch(`${API_BASE_URL}/api/expenses?month=${mesSelecionado}`);
+
+    if (!resposta.ok) {
+      throw new Error("Erro ao buscar gastos.");
+    }
+
+    const dados = await resposta.json();
+
+    gastos = dados.map((item) => {
+      return {
+        id: item.id,
+        descricao: item.name,
+        valor: Number(item.value),
+        categoria: item.category,
+        data: item.date
+      };
+    });
+  } catch (erro) {
+    console.error("Erro ao carregar gastos:", erro);
+    alert("Não foi possível carregar os gastos online.");
+    gastos = [];
+  }
+}
+
+async function salvarGastoOnline(gasto) {
+  const resposta = await fetch(`${API_BASE_URL}/api/expenses`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      name: gasto.descricao,
+      value: Number(gasto.valor),
+      category: gasto.categoria,
+      date: gasto.data
+    })
+  });
+
+  const texto = await resposta.text();
+
+
+
+  if (!resposta.ok) {
+    throw new Error(texto || "Erro ao salvar gasto.");
+  }
+
+  return JSON.parse(texto);
+}
+async function excluirGastoOnline(id) {
+  const resposta = await fetch(`${API_BASE_URL}/api/expenses?id=${id}`, {
+    method: "DELETE"
+  });
+
+  if (!resposta.ok) {
+    throw new Error("Erro ao excluir gasto.");
+  }
+
+  return await resposta.json();
 }
 
 function pegarGastosDoMes() {
@@ -48,38 +110,56 @@ function pegarGastosDoMes() {
   });
 }
 
-function adicionarGasto(event) {
+function atualizarTudo() {
+  mostrarGastos();
+  atualizarTotal();
+  atualizarOrcamento();
+  atualizarSaldo();
+  atualizarDashboardCategorias();
+}
+
+async function adicionarGasto(event) {
   event.preventDefault();
 
-  const descricao = descricaoInput.value;
+  const descricao = descricaoInput.value.trim();
   const valor = Number(valorInput.value);
   const categoria = categoriaInput.value;
   const data = dataInput.value;
 
+  if (!descricao || valor <= 0 || !categoria || !data) {
+    alert("Preencha todos os campos corretamente.");
+    return;
+  }
+
   const novoGasto = {
-    id: Date.now(),
-    descricao: descricao,
-    valor: valor,
-    categoria: categoria,
-    data: data
+    descricao,
+    valor,
+    categoria,
+    data
   };
 
-  gastos.push(novoGasto);
+  try {
+    await salvarGastoOnline(novoGasto);
+    await buscarGastosOnline();
+    atualizarTudo();
 
-    salvarNoLocalStorage();
-    mostrarGastos();
-    atualizarTotal();
-    atualizarSaldo();
-    atualizarDashboardCategorias();
-
-  formGasto.reset();
-  dataInput.value = new Date().toISOString().split("T")[0];
+    formGasto.reset();
+    dataInput.value = new Date().toISOString().split("T")[0];
+  } catch (erro) {
+    console.error("Erro ao adicionar gasto:", erro);
+    alert("Não foi possível salvar o gasto online.");
+  }
 }
 
 function mostrarGastos() {
   listaGastos.innerHTML = "";
 
   const gastosDoMes = pegarGastosDoMes();
+
+  if (gastosDoMes.length === 0) {
+    listaGastos.innerHTML = "<li class='mensagem-vazia'>Nenhum gasto cadastrado neste mês.</li>";
+    return;
+  }
 
   gastosDoMes.forEach((gasto) => {
     const item = document.createElement("li");
@@ -93,7 +173,7 @@ function mostrarGastos() {
 
       <div>
         <p class="gasto-valor">${formatarMoeda(gasto.valor)}</p>
-        <button class="btn-excluir" onclick="excluirGasto(${gasto.id})">
+        <button class="btn-excluir" onclick="excluirGasto('${gasto.id}')">
           Excluir
         </button>
       </div>
@@ -107,7 +187,7 @@ function atualizarTotal() {
   const gastosDoMes = pegarGastosDoMes();
 
   const total = gastosDoMes.reduce((soma, gasto) => {
-    return soma + gasto.valor;
+    return soma + Number(gasto.valor);
   }, 0);
 
   totalGasto.textContent = formatarMoeda(total);
@@ -120,9 +200,9 @@ function atualizarOrcamento() {
 function atualizarSaldo() {
   const gastosDoMes = pegarGastosDoMes();
 
-const total = gastosDoMes.reduce((soma, gasto) => {
-  return soma + gasto.valor;
-}, 0);
+  const total = gastosDoMes.reduce((soma, gasto) => {
+    return soma + Number(gasto.valor);
+  }, 0);
 
   const saldo = orcamento - total;
 
@@ -143,7 +223,7 @@ function atualizarDashboardCategorias() {
   const gastosDoMes = pegarGastosDoMes();
 
   const total = gastosDoMes.reduce((soma, gasto) => {
-    return soma + gasto.valor;
+    return soma + Number(gasto.valor);
   }, 0);
 
   if (gastosDoMes.length === 0) {
@@ -155,9 +235,9 @@ function atualizarDashboardCategorias() {
 
   gastosDoMes.forEach((gasto) => {
     if (categorias[gasto.categoria]) {
-      categorias[gasto.categoria] += gasto.valor;
+      categorias[gasto.categoria] += Number(gasto.valor);
     } else {
-      categorias[gasto.categoria] = gasto.valor;
+      categorias[gasto.categoria] = Number(gasto.valor);
     }
   });
 
@@ -186,14 +266,21 @@ function atualizarDashboardCategorias() {
   });
 }
 
-function excluirGasto(id) {
-  gastos = gastos.filter((gasto) => gasto.id !== id);
+async function excluirGasto(id) {
+  const confirmar = confirm("Deseja excluir este gasto?");
 
-  salvarNoLocalStorage();
-  mostrarGastos();
-  atualizarTotal();
-  atualizarSaldo();
-  atualizarDashboardCategorias();
+  if (!confirmar) {
+    return;
+  }
+
+  try {
+    await excluirGastoOnline(id);
+    await buscarGastosOnline();
+    atualizarTudo();
+  } catch (erro) {
+    console.error("Erro ao excluir gasto:", erro);
+    alert("Não foi possível excluir o gasto.");
+  }
 }
 
 formGasto.addEventListener("submit", adicionarGasto);
@@ -209,7 +296,7 @@ btnAdicionarOrcamento.addEventListener("click", function () {
   orcamento = orcamento + valor;
 
   orcamentos[mesSelecionado] = orcamento;
-localStorage.setItem("orcamentos", JSON.stringify(orcamentos));
+  localStorage.setItem("orcamentos", JSON.stringify(orcamentos));
 
   atualizarOrcamento();
   atualizarSaldo();
@@ -232,7 +319,7 @@ btnRetirarOrcamento.addEventListener("click", function () {
   }
 
   orcamentos[mesSelecionado] = orcamento;
-localStorage.setItem("orcamentos", JSON.stringify(orcamentos));
+  localStorage.setItem("orcamentos", JSON.stringify(orcamentos));
 
   atualizarOrcamento();
   atualizarSaldo();
@@ -250,8 +337,8 @@ btnDefinirOrcamento.addEventListener("click", function () {
 
   orcamento = valor;
 
- orcamentos[mesSelecionado] = orcamento;
-localStorage.setItem("orcamentos", JSON.stringify(orcamentos));
+  orcamentos[mesSelecionado] = orcamento;
+  localStorage.setItem("orcamentos", JSON.stringify(orcamentos));
 
   atualizarOrcamento();
   atualizarSaldo();
@@ -259,16 +346,13 @@ localStorage.setItem("orcamentos", JSON.stringify(orcamentos));
   orcamentoInput.value = "";
 });
 
-mesSelecionadoInput.addEventListener("change", function () {
+mesSelecionadoInput.addEventListener("change", async function () {
   mesSelecionado = mesSelecionadoInput.value;
 
   orcamento = Number(orcamentos[mesSelecionado]) || 0;
 
-  mostrarGastos();
-  atualizarTotal();
-  atualizarOrcamento();
-  atualizarSaldo();
-  atualizarDashboardCategorias();
+  await buscarGastosOnline();
+  atualizarTudo();
 });
 
 let eventoInstalacao = null;
@@ -291,7 +375,6 @@ function mostrarBotaoInstalar() {
   }
 }
 
-// Se já estiver aberto como app instalado, esconde o botão
 window.addEventListener("load", function () {
   if (estaNoModoApp()) {
     esconderBotaoInstalar();
@@ -300,7 +383,6 @@ window.addEventListener("load", function () {
   }
 });
 
-// Chrome Android libera esse evento quando o PWA está pronto para instalar
 window.addEventListener("beforeinstallprompt", function (event) {
   event.preventDefault();
 
@@ -309,35 +391,46 @@ window.addEventListener("beforeinstallprompt", function (event) {
   mostrarBotaoInstalar();
 });
 
-btnInstallApp.addEventListener("click", async function () {
-  if (estaNoModoApp()) {
-    esconderBotaoInstalar();
-    return;
-  }
+if (btnInstallApp) {
+  btnInstallApp.addEventListener("click", async function () {
+    if (estaNoModoApp()) {
+      esconderBotaoInstalar();
+      return;
+    }
 
-  if (!eventoInstalacao) {
-    alert("Para instalar, toque nos três pontinhos do navegador e escolha 'Adicionar à tela inicial' ou 'Instalar app'.");
-    return;
-  }
+    if (!eventoInstalacao) {
+      alert("Para instalar, toque nos três pontinhos do navegador e escolha 'Adicionar à tela inicial' ou 'Instalar app'.");
+      return;
+    }
 
-  eventoInstalacao.prompt();
+    eventoInstalacao.prompt();
 
-  const escolha = await eventoInstalacao.userChoice;
+    const escolha = await eventoInstalacao.userChoice;
 
-  if (escolha.outcome === "accepted") {
-    esconderBotaoInstalar();
-  }
+    if (escolha.outcome === "accepted") {
+      esconderBotaoInstalar();
+    }
 
-  eventoInstalacao = null;
-});
+    eventoInstalacao = null;
+  });
+}
 
-// Quando instalar, esconde o botão
 window.addEventListener("appinstalled", function () {
   esconderBotaoInstalar();
 });
 
-mostrarGastos();
-atualizarTotal();
-atualizarOrcamento();
-atualizarSaldo();
-atualizarDashboardCategorias();
+async function iniciarApp() {
+  await buscarGastosOnline();
+  atualizarTudo();
+}
+
+iniciarApp();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker
+      .register("./service-worker.js")
+      .then(() => console.log("Service Worker registrado."))
+      .catch((erro) => console.error("Erro ao registrar Service Worker:", erro));
+  });
+}
