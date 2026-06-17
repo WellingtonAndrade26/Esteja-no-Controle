@@ -1,275 +1,158 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Esteja no Controle</title>
-
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=6">
   <link rel="manifest" href="./manifest.json">
-
   <meta name="theme-color" content="#ec4899">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Controle">
-
   <link rel="apple-touch-icon" href="./images/icon-192.png">
 </head>
-
 <body>
-
-  <!-- LOGIN -->
   <section id="loginBox" class="login-screen">
-  <div class="login-card">
-    <div class="login-banner">
-  <img 
-    src="./images/banner-controle.png" 
-    alt="Controle da Letícia" 
-  >
-</div>
-
-    <h1>Esteja no Controle</h1>
-
-    <div id="loginForm">
-      <p>Entre na sua conta.</p>
-
-      <input 
-        type="email" 
-        id="loginEmail" 
-        placeholder="Email"
-      >
-
-      <input 
-        type="password" 
-        id="loginSenha" 
-        placeholder="Senha"
-      >
-
-      <button id="btnLogin" type="button">
-        Entrar
-      </button>
-
-      <button id="btnMostrarCadastro" class="btn-link" type="button">
-        Criar nova conta
-      </button>
+    <div class="login-card">
+      <div class="brand-mark brand-mark-login" aria-hidden="true"><span></span><span></span><span></span></div>
+      <h1>Esteja no <strong>Controle</strong></h1>
+      <div id="loginForm" class="auth-form">
+        <p>Entre para acompanhar seu orçamento e seus gastos.</p>
+        <label class="field"><span>Email</span><input type="email" id="loginEmail" placeholder="voce@email.com" autocomplete="email"></label>
+        <label class="field"><span>Senha</span><input type="password" id="loginSenha" placeholder="Sua senha" autocomplete="current-password"></label>
+        <button id="btnLogin" class="primary-button" type="button">Entrar</button>
+        <button id="btnMostrarCadastro" class="link-button" type="button">Criar nova conta</button>
+      </div>
+      <div id="cadastroForm" class="auth-form oculto">
+        <p>Crie sua conta para começar seu controle financeiro.</p>
+        <label class="field"><span>Nome</span><input type="text" id="cadastroNome" placeholder="Seu nome" autocomplete="name"></label>
+        <label class="field"><span>Email</span><input type="email" id="cadastroEmail" placeholder="voce@email.com" autocomplete="email"></label>
+        <label class="field"><span>Senha</span><input type="password" id="cadastroSenha" placeholder="Crie uma senha" autocomplete="new-password"></label>
+        <label class="field"><span>Confirmar senha</span><input type="password" id="cadastroConfirmarSenha" placeholder="Repita a senha" autocomplete="new-password"></label>
+        <button id="btnCadastrar" class="primary-button" type="button">Criar conta</button>
+        <button id="btnMostrarLogin" class="link-button" type="button">Já tenho conta</button>
+      </div>
+      <small id="loginMensagem" role="status"></small>
     </div>
-
-    <div id="cadastroForm" class="oculto">
-      <p>Crie sua conta.</p>
-
-      <input 
-        type="text" 
-        id="cadastroNome" 
-        placeholder="Nome"
-      >
-
-      <input 
-        type="email" 
-        id="cadastroEmail" 
-        placeholder="Email"
-      >
-
-      <input 
-        type="password" 
-        id="cadastroSenha" 
-        placeholder="Senha"
-      >
-
-      <input 
-        type="password" 
-        id="cadastroConfirmarSenha" 
-        placeholder="Confirmar senha"
-      >
-
-      <button id="btnCadastrar" type="button">
-        Criar conta
-      </button>
-
-      <button id="btnMostrarLogin" class="btn-link" type="button">
-        Já tenho conta
-      </button>
-    </div>
-
-    <small id="loginMensagem"></small>
-  </div>
-</section>
-
-  <!-- APP -->
+  </section>
   <div id="appConteudo" class="app oculto">
-
-   <header class="hero-banner">
-  <img 
-    src="./images/banner-controle.png?v=5" 
-    alt="Esteja no Controle" 
-    class="hero-banner-img"
-  >
-</header>
-
-<section class="welcome-card">
-  <div class="welcome-icon">
-    <img src="./images/perfil.png?v=5" alt="" class="welcome-icon-img">
-  </div>
-
-  <div class="welcome-text">
-    <span id="boasVindasBanner">Bem-vindo(a), Usuário</span>
-  </div>
-</section>
-
-<button id="btnInstallApp" class="btn-instalar" type="button">
-  Instalar App
-</button>
-
-    <section class="card filtro-mes">
-      <label for="mesSelecionado">Mês selecionado</label>
-
-      <input 
-        type="month" 
-        id="mesSelecionado"
-      >
-    </section>
-
-    <!-- VALOR GUARDADO -->
-    <section class="card guardado-box">
-  <h2>Valor guardado disponível</h2>
-
-  <div class="guardado-total">
-    <span>Soma do que sobrou nos meses</span>
-    <strong id="valorGuardadoTotal">R$ 0,00</strong>
-  </div>
-</section>
-
-    <section class="card resumo">
-      <h2>Resumo do mês</h2>
-
-      <div class="orcamento-box">
-        <label for="orcamentoInput">Orçamento do mês</label>
-
-        <div class="orcamento-linha">
-          <input 
-            type="number" 
-            id="orcamentoInput" 
-            placeholder="Ex: 1500" 
-            step="0.01"
-          >
-        </div>
-
-        <div class="botoes-orcamento">
-          <button id="btnAdicionarOrcamento" type="button">
-            Adicionar
-          </button>
-
-          <button id="btnRetirarOrcamento" type="button">
-            Retirar
-          </button>
-
-          <button id="btnDefinirOrcamento" type="button">
-            Definir
-          </button>
-        </div>
+    <header class="app-header" id="inicioSection" data-view="home">
+      <div class="brand-row">
+        <div class="brand-lockup"><div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div><div><span>Esteja no</span><strong>Controle</strong></div></div>
+        <button id="btnInstallApp" class="icon-button install-button oculto" type="button" aria-label="Instalar app"><i data-lucide="download"></i></button>
       </div>
-
-      <div class="resumo-valores">
-        <div>
-          <span>Total gasto</span>
-          <strong id="totalGasto">R$ 0,00</strong>
+    </header>
+    <main>
+      <section class="hero-card saldo-box" data-view="home">
+        <div class="hero-copy">
+          <p id="boasVindasBanner">Olá, Usuário! 👋</p>
+          <label class="month-picker" for="mesSelecionado"><input type="month" id="mesSelecionado"><i data-lucide="chevron-down"></i></label>
+          <div class="saldo-principal"><small id="textoSaldo">Saldo disponível</small><strong id="saldoRestante">R$ 0,00</strong></div>
         </div>
-
-        <div>
-          <span>Orçamento</span>
-          <strong id="orcamentoTotal">R$ 0,00</strong>
+        <div class="hero-art" aria-hidden="true"><div class="coin coin-one">R$</div><div class="coin coin-two">$</div><div class="piggy"></div><div class="chart-bars"><span></span><span></span><span></span><span></span></div></div>
+        <div class="hero-metrics">
+          <div class="glass-card"><span class="metric-icon pink"><i data-lucide="lock-keyhole"></i></span><div><small>Valor guardado</small><strong id="valorGuardadoTotal">R$ 0,00</strong></div></div>
+          <div class="glass-card"><span class="metric-icon rose"><i data-lucide="credit-card"></i></span><div><small>Total gasto</small><strong id="totalGasto">R$ 0,00</strong></div></div>
         </div>
-      </div>
+      </section>
+      <section class="quick-actions" aria-labelledby="acoesTitulo" data-view="home"><h2 id="acoesTitulo">Ações rápidas</h2><div class="quick-grid">
+        <button class="quick-action" type="button" data-scroll-target="gastoSection" data-view-target="expenses"><span class="quick-icon green"><i data-lucide="plus"></i></span><strong>Adicionar</strong><small>Gasto</small></button>
+        <button class="quick-action" type="button" data-scroll-target="orcamentoSection"><span class="quick-icon pink"><i data-lucide="arrow-up-down"></i></span><strong>Ajustar</strong><small>Orçamento</small></button>
+        <button class="quick-action" type="button" data-scroll-target="metaSection" data-view-target="home"><span class="quick-icon violet"><i data-lucide="target"></i></span><strong>Definir</strong><small>Meta</small></button>
+      </div></section>
+      <section class="card summary-card" id="orcamentoSection" data-view="home">
+        <div class="section-title-row"><h2>Resumo do mês</h2><button class="text-action" type="button" data-scroll-target="relatoriosSection" data-view-target="reports">Ver detalhes <i data-lucide="chevron-right"></i></button></div>
+        <div class="summary-grid">
+          <div class="summary-item blue"><span><i data-lucide="wallet"></i></span><small>Orçamento</small><strong id="orcamentoTotal">R$ 0,00</strong></div>
+          <div class="summary-item pink"><span><i data-lucide="receipt-text"></i></span><small>Gastos</small><strong id="resumoGastos">R$ 0,00</strong></div>
+          <div class="summary-item green"><span><i data-lucide="sparkles"></i></span><small>Disponível</small><strong id="resumoDisponivel">R$ 0,00</strong></div>
+        </div>
+        <div class="budget-controls">
+          <label class="field compact-field"><span>Valor do orçamento</span><input type="number" id="orcamentoInput" placeholder="Ex: 1500" step="0.01" inputmode="decimal"></label>
+          <div class="budget-buttons"><button id="btnAdicionarOrcamento" class="soft-button" type="button">Adicionar</button><button id="btnRetirarOrcamento" class="soft-button" type="button">Retirar</button><button id="btnDefinirOrcamento" class="primary-button small" type="button">Definir</button></div>
+        </div>
+      </section>
+      <section class="card goal-card goal-card-model" id="metaSection" data-view="home">
 
-      <div class="saldo-box">
-        <span id="textoSaldo">Disponível</span>
-        <strong id="saldoRestante">R$ 0,00</strong>
-      </div>
-    </section>
+  <div class="goal-overlay">
 
-    <section class="card">
-      <h2>Adicionar gasto</h2>
+    <h2>Meta do mês</h2>
 
-      <form id="formGasto">
-        <input 
-          type="text" 
-          id="descricao" 
-          placeholder="Descrição do gasto" 
-          required
+    <div class="goal-values">
+      <strong id="metaAlcancado">R$ 0,00</strong>
+      <span>/</span>
+      <span id="metaValor">R$ 0,00</span>
+    </div>
+
+    <div class="goal-progress">
+      <span id="metaProgressoBarra"></span>
+    </div>
+
+    <p class="goal-copy">
+      Você atingiu
+      <strong id="metaStatus">0%</strong>
+      da sua meta!
+    </p>
+
+    <div class="goal-edit">
+      <label class="field compact-field">
+        <span>Valor da meta</span>
+        <input
+          type="number"
+          id="metaInput"
+          placeholder="Ex: 500"
+          step="0.01"
+          inputmode="decimal"
         >
+      </label>
 
-        <input 
-          type="number" 
-          id="valor" 
-          placeholder="Valor do gasto" 
-          step="0.01" 
-          required
-        >
-
-        <select id="categoria" required>
-          <option value="Mercado">Mercado</option>
-          <option value="Transporte">Transporte</option>
-          <option value="Contas">Contas</option>
-          <option value="Alimentação">Alimentação</option>
-          <option value="Saúde">Saúde</option>
-          <option value="Lazer">Lazer</option>
-          <option value="Casa">Casa</option>
-          <option value="Outros">Outros</option>
-        </select>
-
-        <input 
-          type="date" 
-          id="data" 
-          required
-        >
-
-        <button type="submit">
-          Salvar gasto
-        </button>
-      </form>
-    </section>
-
-    <section class="card">
-      <h2>Onde o dinheiro foi</h2>
-
-      <div id="dashboardCategorias">
-        <!-- O resumo por categoria vai aparecer aqui -->
-      </div>
-    </section>  
-
-    <section class="card">
-      <h2>Gastos cadastrados</h2>
-
-      
-
-      <ul id="listaGastos">
-        <!-- Os gastos vão aparecer aqui pelo JavaScript -->
-      </ul>
-    </section>
-
-    <section class="card sair-card">
-  <button id="btnSair" class="btn-sair" type="button">
-    Sair da conta
-  </button>
-</section>
+      <button
+        id="btnDefinirMeta"
+        class="primary-button small"
+        type="button">
+        Salvar
+      </button>
+    </div>
 
   </div>
 
-  <script src="./script.js"></script>
-
+</section>
+   <section class="card form-card" id="gastoSection" data-view="expenses">
+        <div class="section-title-row"><h2>Adicionar gasto</h2></div>
+        <form id="formGasto" class="expense-form">
+          <label class="field"><span>Descrição</span><input type="text" id="descricao" placeholder="Mercado, Uber, Luz..." required></label>
+          <div class="form-row"><label class="field"><span>Valor</span><input type="number" id="valor" placeholder="0,00" step="0.01" inputmode="decimal" required></label><label class="field"><span>Data</span><input type="date" id="data" required></label></div>
+          <label class="field"><span>Categoria</span><select id="categoria" required><option value="Mercado">Mercado</option><option value="Transporte">Transporte</option><option value="Contas">Contas</option><option value="Alimentação">Alimentação</option><option value="Saúde">Saúde</option><option value="Lazer">Lazer</option><option value="Casa">Casa</option><option value="Outros">Outros</option></select></label>
+          <button class="primary-button" type="submit">Salvar gasto</button>
+        </form>
+      </section>
+      <section class="card chart-card" id="relatoriosSection" data-view="reports">
+        <div class="section-title-row"><h2>Onde o dinheiro foi</h2></div>
+        <div class="chart-layout"><div class="chart-wrap"><canvas id="categoriaChart" aria-label="Gráfico de gastos por categoria"></canvas></div><div id="dashboardCategorias" class="category-list"></div></div>
+      </section>
+      <section class="card expenses-card" id="listaSection" data-view="expenses">
+        <div class="section-title-row"><h2>Últimos gastos</h2><button class="text-action" type="button" data-scroll-target="listaSection">Ver todos <i data-lucide="chevron-right"></i></button></div>
+        <ul id="listaGastos" class="expense-list"></ul>
+      </section>
+      <section class="card profile-card" id="perfilSection" data-view="profile"><div><h2>Perfil</h2><p>Conta conectada ao Controle.</p></div><button id="btnSair" class="danger-button" type="button">Sair da conta</button></section>
+    </main>
+    <nav class="bottom-nav" aria-label="Navegação principal">
+      <button class="nav-item active" type="button" data-scroll-target="inicioSection" data-view-target="home"><i data-lucide="home"></i><span>Início</span></button>
+      <button class="nav-item" type="button" data-scroll-target="gastoSection" data-view-target="expenses"><i data-lucide="wallet-cards"></i><span>Gastos</span></button>
+      <button class="nav-item" type="button" data-scroll-target="relatoriosSection" data-view-target="reports"><i data-lucide="bar-chart-3"></i><span>Relatórios</span></button>
+      <button class="nav-item" type="button" data-scroll-target="perfilSection" data-view-target="profile"><i data-lucide="user-round"></i><span>Perfil</span></button>
+    </nav>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="./script.js?v=6"></script>
   <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", function () {
-        navigator.serviceWorker.register("./service-worker.js")
-          .then(function () {
-            console.log("Service Worker registrado com sucesso.");
-          })
-          .catch(function (erro) {
-            console.log("Erro ao registrar Service Worker:", erro);
-          });
-      });
-    }
+    if ("serviceWorker" in navigator) { window.addEventListener("load", function () { navigator.serviceWorker.register("./service-worker.js").then(function () { console.log("Service Worker registrado com sucesso."); }).catch(function (erro) { console.log("Erro ao registrar Service Worker:", erro); }); }); }
   </script>
-
 </body>
 </html>
+
+
+
+
