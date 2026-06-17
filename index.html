@@ -52,7 +52,13 @@
         </div>
         <div class="hero-art" aria-hidden="true"><div class="coin coin-one">R$</div><div class="coin coin-two">$</div><div class="piggy"></div><div class="chart-bars"><span></span><span></span><span></span><span></span></div></div>
         <div class="hero-metrics">
-          <div class="glass-card"><span class="metric-icon pink"><i data-lucide="lock-keyhole"></i></span><div><small>Valor guardado</small><strong id="valorGuardadoTotal">R$ 0,00</strong></div></div>
+         <div class="glass-card">
+  <span class="metric-icon pink"><i data-lucide="wallet"></i></span>
+  <div>
+    <small>Orçamento</small>
+    <strong id="orcamentoResumo">R$ 0,00</strong>
+  </div>
+</div>
           <div class="glass-card"><span class="metric-icon rose"><i data-lucide="credit-card"></i></span><div><small>Total gasto</small><strong id="totalGasto">R$ 0,00</strong></div></div>
         </div>
       </section>
@@ -89,11 +95,11 @@
       <span id="metaProgressoBarra"></span>
     </div>
 
-    <p class="goal-copy">
-      Você atingiu
-      <strong id="metaStatus">0%</strong>
-      da sua meta!
-    </p>
+    <p class="goal-copy" id="metaTexto">
+  Você atingiu
+  <strong id="metaStatus">0%</strong>
+  da sua meta!
+</p>
 
     <div class="goal-edit">
       <label class="field compact-field">
@@ -118,6 +124,32 @@
   </div>
 
 </section>
+
+<!-- TOTAL GUARDADO -->
+<section class="card savings-card">
+
+    <div class="savings-info">
+
+        <small>Total Guardado</small>
+
+        <strong id="valorGuardadoTotal">
+            R$ 0,00
+        </strong>
+
+        <span>
+            Patrimônio acumulado
+        </span>
+
+    </div>
+
+    <div class="savings-image">
+        <img
+            src="./images/guardado-banner.png"
+            alt="Total Guardado">
+    </div>
+
+</section>
+
    <section class="card form-card" id="gastoSection" data-view="expenses">
         <div class="section-title-row"><h2>Adicionar gasto</h2></div>
         <form id="formGasto" class="expense-form">
