@@ -48,12 +48,17 @@
     })
   });
 
+  const texto = await response.text();
+
+  console.log("STATUS META:", response.status);
+  console.log("RESPOSTA META:", texto);
+
   if(!response.ok){
     console.error("Erro ao salvar meta");
     return;
   }
 
-  return await response.json();
+  return JSON.parse(texto);
 }
   async function salvarGastoOnline(gasto){const resposta=await fetch(`${API_BASE_URL}/api/expenses`,{method:"POST",headers:authHeaders(),body:JSON.stringify({name:gasto.descricao,value:Number(gasto.valor),category:gasto.categoria,date:gasto.data})}),texto=await resposta.text();if(!resposta.ok)throw new Error(texto||"Erro ao salvar gasto.");return JSON.parse(texto)}
   async function excluirGastoOnline(id){const resposta=await fetch(`${API_BASE_URL}/api/expenses?id=${id}`,{method:"DELETE",headers:authHeaders()});if(!resposta.ok)throw new Error("Erro ao excluir gasto.");return await resposta.json()}
@@ -130,9 +135,10 @@ async function buscarMetaOnline(){
 
   metaAtual = dados.length ? Number(dados[0].value) : 0;
 
+  atualizarMeta();
 }
   function salvarMetaMes(valor){metasMensais[chaveMetaMes()]=Number(valor)||0;localStorage.setItem("metas_mensais",JSON.stringify(metasMensais))}
-  function atualizarMeta(){if(!metaValor||!metaAlcancado||!metaStatus||!metaTexto||!metaProgressoBarra)return;const meta=metaAtual;,guardadoNoMes=Math.max(0,orcamento-calcularTotalGasto()),progresso=meta>0?Math.min(100,guardadoNoMes/meta*100):0;metaValor.textContent=formatarMoeda(meta);metaAlcancado.textContent=formatarMoeda(guardadoNoMes);metaProgressoBarra.style.width=`${progresso}%`;if(meta<=0){metaStatus.textContent="Sem meta";metaTexto.textContent="Defina quanto você quer guardar neste mês. A meta usa a sobra do orçamento depois dos gastos.";return}if(progresso>=100){metaStatus.textContent="Meta batida";metaTexto.textContent=`Você alcançou ${Math.round(progresso)}% da meta. Sobra atual: ${formatarMoeda(guardadoNoMes)}.`;return}metaStatus.textContent=`${Math.round(progresso)}% concluída`;metaTexto.textContent=`Faltam ${formatarMoeda(Math.max(0,meta-guardadoNoMes))} para bater sua meta deste mês.`}
+  function atualizarMeta(){if(!metaValor||!metaAlcancado||!metaStatus||!metaTexto||!metaProgressoBarra)return;const meta=metaAtual,guardadoNoMes=Math.max(0,orcamento-calcularTotalGasto()),progresso=meta>0?Math.min(100,guardadoNoMes/meta*100):0;metaValor.textContent=formatarMoeda(meta);metaAlcancado.textContent=formatarMoeda(guardadoNoMes);metaProgressoBarra.style.width=`${progresso}%`;if(meta<=0){metaStatus.textContent="Sem meta";metaTexto.textContent="Defina quanto você quer guardar neste mês. A meta usa a sobra do orçamento depois dos gastos.";return}if(progresso>=100){metaStatus.textContent="Meta batida";metaTexto.textContent=`Você alcançou ${Math.round(progresso)}% da meta. Sobra atual: ${formatarMoeda(guardadoNoMes)}.`;return}metaStatus.textContent=`${Math.round(progresso)}% concluída`;metaTexto.textContent=`Faltam ${formatarMoeda(Math.max(0,meta-guardadoNoMes))} para bater sua meta deste mês.`}
   btnDefinirMeta?.addEventListener("click",async function(){
 
   const valor=Number(metaInput.value);
@@ -144,9 +150,9 @@ async function buscarMetaOnline(){
 
   await salvarMetaOnline(valor);
 
-  metaInput.value="";
+await buscarMetaOnline();
 
-  atualizarMeta();
+metaInput.value="";
 
 });
   const atualizarTudoOriginal=atualizarTudo;atualizarTudo=function(){atualizarTudoOriginal();atualizarMeta()};
