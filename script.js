@@ -1,167 +1,946 @@
-﻿  const API_BASE_URL="https://controle-gastos-api-ruby.vercel.app";
-  const loginBox=document.getElementById("loginBox"),appConteudo=document.getElementById("appConteudo"),loginForm=document.getElementById("loginForm"),cadastroForm=document.getElementById("cadastroForm"),btnSair=document.getElementById("btnSair"),boasVindasBanner=document.getElementById("boasVindasBanner"),loginEmailInput=document.getElementById("loginEmail"),loginSenhaInput=document.getElementById("loginSenha"),cadastroNomeInput=document.getElementById("cadastroNome"),cadastroEmailInput=document.getElementById("cadastroEmail"),cadastroSenhaInput=document.getElementById("cadastroSenha"),cadastroConfirmarSenhaInput=document.getElementById("cadastroConfirmarSenha"),btnLogin=document.getElementById("btnLogin"),btnCadastrar=document.getElementById("btnCadastrar"),btnMostrarCadastro=document.getElementById("btnMostrarCadastro"),btnMostrarLogin=document.getElementById("btnMostrarLogin"),loginMensagem=document.getElementById("loginMensagem"),formGasto=document.getElementById("formGasto"),descricaoInput=document.getElementById("descricao"),valorInput=document.getElementById("valor"),categoriaInput=document.getElementById("categoria"),dataInput=document.getElementById("data"),orcamentoTotal=document.getElementById("orcamentoTotal"),orcamentoResumo=document.getElementById("orcamentoResumo"),orcamentoInput=document.getElementById("orcamentoInput"),mesSelecionadoInput=document.getElementById("mesSelecionado"),btnAdicionarOrcamento=document.getElementById("btnAdicionarOrcamento"),btnRetirarOrcamento=document.getElementById("btnRetirarOrcamento"),btnDefinirOrcamento=document.getElementById("btnDefinirOrcamento"),listaGastos=document.getElementById("listaGastos"),totalGasto=document.getElementById("totalGasto"),resumoGastos=document.getElementById("resumoGastos"),resumoDisponivel=document.getElementById("resumoDisponivel"),saldoRestante=document.getElementById("saldoRestante"),textoSaldo=document.getElementById("textoSaldo"),saldoBox=document.querySelector(".saldo-box"),dashboardCategorias=document.getElementById("dashboardCategorias"),valorGuardadoTotal=document.getElementById("valorGuardadoTotal"),btnInstallApp=document.getElementById("btnInstallApp"),categoriaChartCanvas=document.getElementById("categoriaChart");
-  let APP_TOKEN=localStorage.getItem("app_token")||"",gastos=[],orcamentos={},mesSelecionado=new Date().toISOString().slice(0,7),orcamento=0,eventoInstalacao=null,categoriaChart=null;
-  const categoriaConfig={"Alimentação":{cor:"#f72d90",icone:"🍔"},Mercado:{cor:"#f72d90",icone:"🛒"},Transporte:{cor:"#4596ee",icone:"🚙"},Casa:{cor:"#8d79dd",icone:"🏠"},Contas:{cor:"#8d79dd",icone:"🧾"},Lazer:{cor:"#ff9b4a",icone:"🎮"},Saúde:{cor:"#21b970",icone:"💊"},Outros:{cor:"#6ee0a2",icone:"•••"}};
-  if(mesSelecionadoInput)mesSelecionadoInput.value=mesSelecionado;if(dataInput)dataInput.value=new Date().toISOString().split("T")[0];
-  function atualizarGuardadoSimples() {
-  if (!valorGuardadoTotal) return;
+"use strict";
 
-  let totalGuardado = 0;
+const API_BASE_URL = "https://controle-gastos-api-ruby.vercel.app";
 
-  Object.keys(orcamentos).forEach(mes => {
-    const orcamentoDoMes = Number(orcamentos[mes]) || 0;
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => [...document.querySelectorAll(selector)];
 
-    const gastosDoMes = gastos.filter(gasto =>
-      gasto.data.startsWith(mes)
-    );
+const elements = {
+  loginBox: $("#loginBox"),
+  appConteudo: $("#appConteudo"),
+  loginForm: $("#loginForm"),
+  cadastroForm: $("#cadastroForm"),
+  loginEmail: $("#loginEmail"),
+  loginSenha: $("#loginSenha"),
+  cadastroNome: $("#cadastroNome"),
+  cadastroEmail: $("#cadastroEmail"),
+  cadastroSenha: $("#cadastroSenha"),
+  cadastroConfirmarSenha: $("#cadastroConfirmarSenha"),
+  btnLogin: $("#btnLogin"),
+  btnCadastrar: $("#btnCadastrar"),
+  btnMostrarCadastro: $("#btnMostrarCadastro"),
+  btnMostrarLogin: $("#btnMostrarLogin"),
+  loginMensagem: $("#loginMensagem"),
+  btnSair: $("#btnSair"),
+  btnInstallApp: $("#btnInstallApp"),
+  btnInstalarPerfil: $("#btnInstalarPerfil"),
+  boasVindasBanner: $("#boasVindasBanner"),
+  nomePerfil: $("#nomePerfil"),
+  emailPerfil: $("#emailPerfil"),
+  mesSelecionado: $("#mesSelecionado"),
+  saldoBox: $(".saldo-box"),
+  textoSaldo: $("#textoSaldo"),
+  saldoRestante: $("#saldoRestante"),
+  orcamentoResumo: $("#orcamentoResumo"),
+  orcamentoTotal: $("#orcamentoTotal"),
+  totalGasto: $("#totalGasto"),
+  resumoGastos: $("#resumoGastos"),
+  resumoDisponivel: $("#resumoDisponivel"),
+  valorGuardadoTotal: $("#valorGuardadoTotal"),
+  percentOrcamentoBar: $("#percentOrcamentoBar"),
+  percentGastoBar: $("#percentGastoBar"),
+  percentSaldoBar: $("#percentSaldoBar"),
+  orcamentoPercentText: $("#orcamentoPercentText"),
+  gastoPercentText: $("#gastoPercentText"),
+  saldoPercentText: $("#saldoPercentText"),
+  orcamentoInput: $("#orcamentoInput"),
+  btnAdicionarOrcamento: $("#btnAdicionarOrcamento"),
+  btnRetirarOrcamento: $("#btnRetirarOrcamento"),
+  btnDefinirOrcamento: $("#btnDefinirOrcamento"),
+  formGasto: $("#formGasto"),
+  descricao: $("#descricao"),
+  valor: $("#valor"),
+  categoria: $("#categoria"),
+  data: $("#data"),
+  listaGastos: $("#listaGastos"),
+  tituloListaGastos: $("#tituloListaGastos"),
+  subtituloListaGastos: $("#subtituloListaGastos"),
+  dashboardCategorias: $("#dashboardCategorias"),
+  categoriaChart: $("#categoriaChart"),
+  chartTotal: $("#chartTotal"),
+  metaValor: $("#metaValor"),
+  metaAlcancado: $("#metaAlcancado"),
+  metaStatus: $("#metaStatus"),
+  metaTexto: $("#metaTexto"),
+  metaProgressoBarra: $("#metaProgressoBarra"),
+  metaInput: $("#metaInput"),
+  btnDefinirMeta: $("#btnDefinirMeta"),
+  metaResumoPagina: $("#metaResumoPagina"),
+  metaProgressoPagina: $("#metaProgressoPagina"),
+  toast: $("#toast")
+};
 
-    const totalGastoDoMes = gastosDoMes.reduce(
-      (soma, gasto) => soma + Number(gasto.valor),
-      0
-    );
+const categoryConfig = {
+  "Alimentação": { color: "#ff6384", icon: "🍔" },
+  "Mercado": { color: "#ff6384", icon: "🛒" },
+  "Casa": { color: "#ff9f55", icon: "🏠" },
+  "Contas": { color: "#ff9f55", icon: "⚡" },
+  "Transporte": { color: "#5ba6e6", icon: "🚙" },
+  "Saúde": { color: "#72c47c", icon: "💊" },
+  "Lazer": { color: "#be72c6", icon: "🎮" },
+  "Outros": { color: "#9aa1ae", icon: "•••" }
+};
 
-    const sobraDoMes = orcamentoDoMes - totalGastoDoMes;
+let appToken = localStorage.getItem("app_token") || "";
+let selectedMonth = new Date().toISOString().slice(0, 7);
+let expenses = [];
+let budgets = {};
+let currentBudget = 0;
+let currentGoal = 0;
+let currentView = "home";
+let installPrompt = null;
+let categoryChart = null;
+let toastTimer = null;
 
-    if (sobraDoMes > 0) {
-      totalGuardado += sobraDoMes;
+function refreshIcons() {
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function formatCurrency(value) {
+  return Number(value || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
+}
+
+function formatCompactCurrency(value) {
+  const number = Number(value || 0);
+  if (Math.abs(number) >= 1000) {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      notation: "compact",
+      maximumFractionDigits: 1
+    }).format(number);
+  }
+  return formatCurrency(number).replace(",00", "");
+}
+
+function formatDate(date) {
+  if (!date) return "";
+  const [year, month, day] = date.slice(0, 10).split("-");
+  return `${day}/${month}/${year}`;
+}
+
+function monthLabel(monthValue) {
+  const [year, month] = monthValue.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function authHeaders() {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${appToken}`
+  };
+}
+
+function setButtonLoading(button, loading, loadingText = "Aguarde...") {
+  if (!button) return;
+  if (loading) {
+    button.dataset.originalHtml = button.innerHTML;
+    button.disabled = true;
+    button.textContent = loadingText;
+  } else {
+    button.disabled = false;
+    if (button.dataset.originalHtml) {
+      button.innerHTML = button.dataset.originalHtml;
+      delete button.dataset.originalHtml;
+      refreshIcons();
     }
+  }
+}
+
+function showToast(message) {
+  if (!elements.toast) return;
+  clearTimeout(toastTimer);
+  elements.toast.textContent = message;
+  elements.toast.classList.add("show");
+  toastTimer = setTimeout(() => elements.toast.classList.remove("show"), 2600);
+}
+
+function showLoginMessage(message) {
+  if (elements.loginMensagem) elements.loginMensagem.textContent = message;
+}
+
+function updateUserDisplay(name, email = "") {
+  const finalName = name || localStorage.getItem("app_user_name") || "Usuário";
+  const firstName = finalName.trim().split(/\s+/)[0] || "Usuário";
+
+  localStorage.setItem("app_user_name", finalName);
+  if (email) localStorage.setItem("app_user_email", email);
+
+  if (elements.boasVindasBanner) {
+    elements.boasVindasBanner.textContent = `Olá, ${firstName}! Sua vida financeira, organizada 💗`;
+  }
+  if (elements.nomePerfil) elements.nomePerfil.textContent = finalName;
+  if (elements.emailPerfil) {
+    elements.emailPerfil.textContent = email || localStorage.getItem("app_user_email") || "Dados protegidos pela sua conta";
+  }
+}
+
+function openApp() {
+  elements.loginBox?.classList.add("oculto");
+  elements.appConteudo?.classList.remove("oculto");
+  updateUserDisplay();
+  refreshIcons();
+}
+
+function closeApp() {
+  elements.loginBox?.classList.remove("oculto");
+  elements.appConteudo?.classList.add("oculto");
+  refreshIcons();
+}
+
+async function apiFetch(path, options = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, options);
+
+  if (response.status === 401) {
+    clearSession();
+    closeApp();
+    showLoginMessage("Sua sessão expirou. Entre novamente.");
+    throw new Error("Sessão expirada.");
+  }
+
+  const text = await response.text();
+  let data = null;
+
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+  }
+
+  if (!response.ok) {
+    const message = data?.error || data?.message || (typeof data === "string" ? data : "Não foi possível concluir a operação.");
+    throw new Error(message);
+  }
+
+  return data;
+}
+
+function clearSession() {
+  localStorage.removeItem("app_token");
+  localStorage.removeItem("app_user_name");
+  localStorage.removeItem("app_user_email");
+  appToken = "";
+  expenses = [];
+  budgets = {};
+  currentBudget = 0;
+  currentGoal = 0;
+}
+
+async function registerUser() {
+  const name = elements.cadastroNome.value.trim();
+  const email = elements.cadastroEmail.value.trim();
+  const password = elements.cadastroSenha.value;
+  const confirmPassword = elements.cadastroConfirmarSenha.value;
+
+  showLoginMessage("");
+
+  if (!name || !email || !password || !confirmPassword) {
+    showLoginMessage("Preencha todos os campos.");
+    return;
+  }
+
+  if (password.length < 4) {
+    showLoginMessage("A senha precisa ter pelo menos 4 caracteres.");
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    showLoginMessage("As senhas não conferem.");
+    return;
+  }
+
+  setButtonLoading(elements.btnCadastrar, true, "Criando conta...");
+
+  try {
+    const data = await apiFetch("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password, confirmPassword })
+    });
+
+    appToken = data.token;
+    localStorage.setItem("app_token", appToken);
+    updateUserDisplay(data.user?.name || name, data.user?.email || email);
+    openApp();
+    await initializeApp();
+  } catch (error) {
+    console.error("Erro no cadastro:", error);
+    showLoginMessage(error.message || "Erro ao criar a conta.");
+  } finally {
+    setButtonLoading(elements.btnCadastrar, false);
+  }
+}
+
+async function loginUser() {
+  const email = elements.loginEmail.value.trim();
+  const password = elements.loginSenha.value;
+
+  showLoginMessage("");
+
+  if (!email || !password) {
+    showLoginMessage("Informe e-mail e senha.");
+    return;
+  }
+
+  setButtonLoading(elements.btnLogin, true, "Entrando...");
+
+  try {
+    const data = await apiFetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+
+    appToken = data.token;
+    localStorage.setItem("app_token", appToken);
+    updateUserDisplay(data.user?.name, data.user?.email || email);
+    openApp();
+    await initializeApp();
+  } catch (error) {
+    console.error("Erro no login:", error);
+    showLoginMessage(error.message || "E-mail ou senha inválidos.");
+  } finally {
+    setButtonLoading(elements.btnLogin, false);
+  }
+}
+
+async function fetchExpenses(month = selectedMonth) {
+  const data = await apiFetch(`/api/expenses?month=${encodeURIComponent(month)}`, {
+    headers: authHeaders()
   });
 
-  valorGuardadoTotal.textContent = formatarMoeda(totalGuardado);
+  expenses = (Array.isArray(data) ? data : []).map((item) => ({
+    id: item.id,
+    description: item.name,
+    value: Number(item.value),
+    category: item.category,
+    date: String(item.date || "").slice(0, 10)
+  }));
 }
-  function authHeaders(){return{"Content-Type":"application/json",Authorization:`Bearer ${APP_TOKEN}`}}function formatarMoeda(valor){return Number(valor||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}function nomeMesAtual(valorMes){const[ano,mes]=valorMes.split("-");return new Date(Number(ano),Number(mes)-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}function atualizarLabelMes(){if(mesSelecionadoInput)mesSelecionadoInput.setAttribute("aria-label",nomeMesAtual(mesSelecionado))}function atualizarBannerUsuario(nome){const nomeFinal=nome||localStorage.getItem("app_user_name")||"Usuário";if(boasVindasBanner)boasVindasBanner.textContent=`Olá, ${nomeFinal}! 👋`}function formatarData(data){const partes=data.split("-");return`${partes[2]}/${partes[1]}/${partes[0]}`}function mostrarMensagemLogin(texto){if(loginMensagem)loginMensagem.textContent=texto}function abrirApp(){loginBox?.classList.add("oculto");appConteudo?.classList.remove("oculto");atualizarBannerUsuario();atualizarIcones()}function fecharApp(){loginBox?.classList.remove("oculto");appConteudo?.classList.add("oculto")}function atualizarIcones(){if(window.lucide)window.lucide.createIcons()}
-  async function cadastrarUsuario(){const name=cadastroNomeInput.value.trim(),email=cadastroEmailInput.value.trim(),password=cadastroSenhaInput.value,confirmPassword=cadastroConfirmarSenhaInput.value;mostrarMensagemLogin("");if(!name||!email||!password||!confirmPassword){mostrarMensagemLogin("Preencha todos os campos.");return}if(password!==confirmPassword){mostrarMensagemLogin("As senhas não conferem.");return}try{const resposta=await fetch(`${API_BASE_URL}/api/register`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,email,password,confirmPassword})}),dados=await resposta.json();if(!resposta.ok){mostrarMensagemLogin(dados.error||"Não foi possível criar a conta.");return}APP_TOKEN=dados.token;localStorage.setItem("app_token",APP_TOKEN);localStorage.setItem("app_user_name",dados.user.name);atualizarBannerUsuario(dados.user.name);abrirApp();await iniciarApp()}catch(erro){console.error("Erro ao cadastrar:",erro);mostrarMensagemLogin("Erro ao conectar com o cadastro.")}}
-  async function fazerLogin(){const email=loginEmailInput.value.trim(),password=loginSenhaInput.value;mostrarMensagemLogin("");if(!email||!password){mostrarMensagemLogin("Informe email e senha.");return}try{const resposta=await fetch(`${API_BASE_URL}/api/login`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})}),dados=await resposta.json();if(!resposta.ok){mostrarMensagemLogin(dados.error||"Email ou senha inválidos.");return}APP_TOKEN=dados.token;localStorage.setItem("app_token",APP_TOKEN);localStorage.setItem("app_user_name",dados.user.name);atualizarBannerUsuario(dados.user.name);abrirApp();await iniciarApp()}catch(erro){console.error("Erro no login:",erro);mostrarMensagemLogin("Erro ao conectar com o login.")}}
-  async function buscarGastosOnline(){const resposta=await fetch(`${API_BASE_URL}/api/expenses?month=${mesSelecionado}`,{headers:authHeaders()});if(resposta.status===401){localStorage.removeItem("app_token");APP_TOKEN="";fecharApp();mostrarMensagemLogin("Faça login novamente.");return}if(!resposta.ok)throw new Error("Erro ao buscar gastos.");const dados=await resposta.json();gastos=dados.map(item=>({id:item.id,descricao:item.name,valor:Number(item.value),categoria:item.category,data:item.date}))}
-  async function buscarTodosGastosOnline(){const resposta=await fetch(`${API_BASE_URL}/api/expenses`,{headers:authHeaders()});if(!resposta.ok)throw new Error("Erro ao buscar todos os gastos.");const dados=await resposta.json();return dados.map(item=>({id:item.id,descricao:item.name,valor:Number(item.value),categoria:item.category,data:item.date}))}
-  async function salvarMetaOnline(valor){
 
-  const response = await fetch(`${API_BASE_URL}/api/goals`,{
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json",
-      "Authorization":`Bearer ${APP_TOKEN}`
-    },
-    body:JSON.stringify({
-      month:mesSelecionado,
-      value:Number(valor)
+async function fetchAllExpenses() {
+  const data = await apiFetch("/api/expenses", { headers: authHeaders() });
+  return (Array.isArray(data) ? data : []).map((item) => ({
+    id: item.id,
+    description: item.name,
+    value: Number(item.value),
+    category: item.category,
+    date: String(item.date || "").slice(0, 10)
+  }));
+}
+
+async function createExpense(expense) {
+  return apiFetch("/api/expenses", {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      name: expense.description,
+      value: Number(expense.value),
+      category: expense.category,
+      date: expense.date
     })
   });
-
-  const texto = await response.text();
-
-  console.log("STATUS META:", response.status);
-  console.log("RESPOSTA META:", texto);
-
-  if(!response.ok){
-    console.error("Erro ao salvar meta");
-    return;
-  }
-
-  return JSON.parse(texto);
 }
-  async function salvarGastoOnline(gasto){const resposta=await fetch(`${API_BASE_URL}/api/expenses`,{method:"POST",headers:authHeaders(),body:JSON.stringify({name:gasto.descricao,value:Number(gasto.valor),category:gasto.categoria,date:gasto.data})}),texto=await resposta.text();if(!resposta.ok)throw new Error(texto||"Erro ao salvar gasto.");return JSON.parse(texto)}
-  async function excluirGastoOnline(id){const resposta=await fetch(`${API_BASE_URL}/api/expenses?id=${id}`,{method:"DELETE",headers:authHeaders()});if(!resposta.ok)throw new Error("Erro ao excluir gasto.");return await resposta.json()}
-  async function buscarOrcamentosOnline(){const resposta=await fetch(`${API_BASE_URL}/api/budgets`,{headers:authHeaders()});if(!resposta.ok)throw new Error("Erro ao buscar orçamentos.");const dados=await resposta.json();orcamentos={};dados.forEach(item=>{orcamentos[item.month]=Number(item.value)});orcamento=Number(orcamentos[mesSelecionado])||0}
-  async function salvarOrcamentoOnline(mes,valor){const resposta=await fetch(`${API_BASE_URL}/api/budgets`,{method:"POST",headers:authHeaders(),body:JSON.stringify({month:mes,value:Number(valor)})}),texto=await resposta.text();if(!resposta.ok)throw new Error(texto||"Erro ao salvar orçamento.");return JSON.parse(texto)}
-  function pegarGastosDoMes(){return gastos.filter(gasto=>gasto.data.startsWith(mesSelecionado))}function calcularTotalGasto(){return pegarGastosDoMes().reduce((soma,gasto)=>soma+Number(gasto.valor),0)}function atualizarTudo(){mostrarGastos();atualizarTotal();atualizarOrcamento();atualizarSaldo();atualizarDashboardCategorias();atualizarLabelMes();atualizarIcones()}
-  async function adicionarGasto(event){event.preventDefault();const descricao=descricaoInput.value.trim(),valor=Number(valorInput.value),categoria=categoriaInput.value,data=dataInput.value;if(!descricao||valor<=0||!categoria||!data){alert("Preencha todos os campos corretamente.");return}try{await salvarGastoOnline({descricao,valor,categoria,data});await buscarGastosOnline();atualizarTudo();await atualizarValorGuardado();formGasto.reset();dataInput.value=new Date().toISOString().split("T")[0]}catch(erro){console.error("Erro ao adicionar gasto:",erro);alert("Não foi possível salvar o gasto online.")}}
-  function obterConfigCategoria(categoria){return categoriaConfig[categoria]||categoriaConfig.Outros}
-  function mostrarGastos(){listaGastos.innerHTML="";const gastosDoMes=[...pegarGastosDoMes()].sort((a,b)=>b.data.localeCompare(a.data));if(gastosDoMes.length===0){listaGastos.innerHTML="<li class='mensagem-vazia'>Nenhum gasto cadastrado neste mês.</li>";return}gastosDoMes.forEach(gasto=>{const config=obterConfigCategoria(gasto.categoria),item=document.createElement("li");item.classList.add("gasto-item");item.innerHTML=`<span class="expense-icon" style="background:${config.cor}18;color:${config.cor}">${config.icone}</span><div class="gasto-info"><strong>${gasto.descricao}</strong><span>${formatarData(gasto.data)} · ${gasto.categoria}</span></div><div class="expense-side"><p class="gasto-valor">${formatarMoeda(gasto.valor)}</p><button class="btn-excluir" type="button" aria-label="Excluir gasto" onclick="excluirGasto('${gasto.id}')"><i data-lucide="more-vertical"></i></button></div>`;listaGastos.appendChild(item)})}
-  function atualizarTotal(){const total=calcularTotalGasto();totalGasto.textContent=formatarMoeda(total);if(resumoGastos)resumoGastos.textContent=formatarMoeda(total)}function atualizarOrcamento(){
-  const valor = formatarMoeda(orcamento);
 
-  if(orcamentoTotal){
-    orcamentoTotal.textContent = valor;
-  }
-
-  if(orcamentoResumo){
-    orcamentoResumo.textContent = valor;
-  }
-}function atualizarSaldo(){const total=calcularTotalGasto(),saldo=orcamento-total,saldoTexto=formatarMoeda(Math.abs(saldo));if(saldo>=0){textoSaldo.textContent="Saldo disponível";saldoRestante.textContent=formatarMoeda(saldo);resumoDisponivel.textContent=formatarMoeda(saldo);saldoBox?.classList.remove("negativo")}else{textoSaldo.textContent="Passou do orçamento";saldoRestante.textContent=saldoTexto;resumoDisponivel.textContent=`-${saldoTexto}`;saldoBox?.classList.add("negativo")}}
-  async function atualizarValorGuardado(){if(!valorGuardadoTotal)return;try{const todosGastos=await buscarTodosGastosOnline();
-    console.log("ORÇAMENTOS", orcamentos);
-console.log("TODOS GASTOS", todosGastos);
-    let totalGuardado=0;Object.keys(orcamentos).forEach(mes=>{const orcamentoDoMes=Number(orcamentos[mes])||0,gastosDoMes=todosGastos.filter(gasto=>gasto.data.startsWith(mes)),totalGastoDoMes=gastosDoMes.reduce((soma,gasto)=>soma+Number(gasto.valor),0),sobraDoMes=orcamentoDoMes-totalGastoDoMes;if(sobraDoMes>0)totalGuardado+=sobraDoMes});valorGuardadoTotal.textContent=formatarMoeda(totalGuardado)}catch(erro){console.error("Erro ao calcular valor guardado:",erro);valorGuardadoTotal.textContent=formatarMoeda(0)}}
-  function agruparCategorias(){const total=calcularTotalGasto(),categorias={};pegarGastosDoMes().forEach(gasto=>{categorias[gasto.categoria]=(categorias[gasto.categoria]||0)+Number(gasto.valor)});return Object.keys(categorias).map(categoria=>({categoria,valor:categorias[categoria],porcentagem:total>0?categorias[categoria]/total*100:0,...obterConfigCategoria(categoria)})).sort((a,b)=>b.valor-a.valor)}
-  function atualizarDashboardCategorias(){dashboardCategorias.innerHTML="";const dadosCategorias=agruparCategorias();if(dadosCategorias.length===0){dashboardCategorias.innerHTML="<p class='mensagem-vazia'>Nenhum gasto cadastrado neste mês.</p>";atualizarGraficoCategorias([]);return}dadosCategorias.forEach(item=>{const linha=document.createElement("div");linha.classList.add("category-row");linha.innerHTML=`<span class="category-dot" style="background:${item.cor}"></span><strong title="${item.categoria}">${item.icone} ${item.categoria}</strong><b>${Math.round(item.porcentagem)}%</b><small>${formatarMoeda(item.valor)}</small>`;dashboardCategorias.appendChild(linha)});atualizarGraficoCategorias(dadosCategorias)}
-  function atualizarGraficoCategorias(dadosCategorias){if(!categoriaChartCanvas||!window.Chart)return;const labels=dadosCategorias.length?dadosCategorias.map(item=>item.categoria):["Sem gastos"],valores=dadosCategorias.length?dadosCategorias.map(item=>item.valor):[1],cores=dadosCategorias.length?dadosCategorias.map(item=>item.cor):["#f3e7ef"];if(!categoriaChart){categoriaChart=new Chart(categoriaChartCanvas,{type:"doughnut",data:{labels,datasets:[{data:valores,backgroundColor:cores,borderColor:"#ffffff",borderWidth:4,hoverOffset:5}]},options:{responsive:true,maintainAspectRatio:false,cutout:"58%",plugins:{legend:{display:false},tooltip:{callbacks:{label(context){return`${context.label}: ${formatarMoeda(context.raw)}`}}}}}});return}categoriaChart.data.labels=labels;categoriaChart.data.datasets[0].data=valores;categoriaChart.data.datasets[0].backgroundColor=cores;categoriaChart.update()}
-  async function excluirGasto(id){const confirmar=confirm("Deseja excluir este gasto?");if(!confirmar)return;try{await excluirGastoOnline(id);await buscarGastosOnline();atualizarTudo();await atualizarValorGuardado()}catch(erro){console.error("Erro ao excluir gasto:",erro);alert("Não foi possível excluir o gasto.")}}
-  function configurarNavegacao(){const botoes=document.querySelectorAll("[data-scroll-target]"),navItems=document.querySelectorAll(".nav-item");botoes.forEach(botao=>{botao.addEventListener("click",()=>{const destino=document.getElementById(botao.dataset.scrollTarget);destino?.scrollIntoView({behavior:"smooth",block:"start"});if(botao.classList.contains("nav-item")){navItems.forEach(item=>item.classList.remove("active"));botao.classList.add("active")}if(botao.dataset.scrollTarget==="orcamentoSection")setTimeout(()=>orcamentoInput?.focus(),450);if(botao.dataset.scrollTarget==="gastoSection")setTimeout(()=>descricaoInput?.focus(),450)})})}
-  formGasto.addEventListener("submit",adicionarGasto);
-  btnAdicionarOrcamento.addEventListener("click",async function(){const valor=Number(orcamentoInput.value);if(valor<=0){alert("Digite um valor para adicionar.");return}try{orcamento+=valor;await salvarOrcamentoOnline(mesSelecionado,orcamento);await buscarOrcamentosOnline();atualizarOrcamento();atualizarSaldo();await atualizarValorGuardado();orcamentoInput.value=""}catch(erro){console.error("Erro ao adicionar orçamento:",erro);alert("Não foi possível salvar o orçamento online.")}});
-  btnRetirarOrcamento.addEventListener("click",async function(){const valor=Number(orcamentoInput.value);if(valor<=0){alert("Digite um valor para retirar.");return}try{orcamento=Math.max(0,orcamento-valor);await salvarOrcamentoOnline(mesSelecionado,orcamento);await buscarOrcamentosOnline();atualizarOrcamento();atualizarSaldo();await atualizarValorGuardado();orcamentoInput.value=""}catch(erro){console.error("Erro ao retirar orçamento:",erro);alert("Não foi possível salvar o orçamento online.")}});
-  btnDefinirOrcamento.addEventListener("click",async function(){const valor=Number(orcamentoInput.value);if(valor<0){alert("Digite um valor válido.");return}try{orcamento=valor;await salvarOrcamentoOnline(mesSelecionado,orcamento);await buscarOrcamentosOnline();atualizarOrcamento();atualizarSaldo();await atualizarValorGuardado();orcamentoInput.value=""}catch(erro){console.error("Erro ao definir orçamento:",erro);alert("Não foi possível salvar o orçamento online.")}});
-  mesSelecionadoInput.addEventListener("change",async function(){mesSelecionado=mesSelecionadoInput.value;await buscarOrcamentosOnline();await buscarGastosOnline();atualizarTudo();await atualizarValorGuardado()});
-  btnMostrarCadastro?.addEventListener("click",function(){loginForm.classList.add("oculto");cadastroForm.classList.remove("oculto");mostrarMensagemLogin("")});
-  btnMostrarLogin?.addEventListener("click",function(){cadastroForm.classList.add("oculto");loginForm.classList.remove("oculto");mostrarMensagemLogin("")});
-  btnLogin?.addEventListener("click",fazerLogin);btnCadastrar?.addEventListener("click",cadastrarUsuario);loginSenhaInput?.addEventListener("keydown",function(event){if(event.key==="Enter")fazerLogin()});cadastroConfirmarSenhaInput?.addEventListener("keydown",function(event){if(event.key==="Enter")cadastrarUsuario()});
-  function estaNoModoApp(){return window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone===true}function esconderBotaoInstalar(){btnInstallApp?.classList.add("oculto")}function mostrarBotaoInstalar(){if(btnInstallApp&&!estaNoModoApp())btnInstallApp.classList.remove("oculto")}
-  window.addEventListener("load",function(){if(estaNoModoApp())esconderBotaoInstalar();else mostrarBotaoInstalar();atualizarIcones()});
-  window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();eventoInstalacao=event;mostrarBotaoInstalar()});
-  btnInstallApp?.addEventListener("click",async function(){if(estaNoModoApp()){esconderBotaoInstalar();return}if(!eventoInstalacao){alert("Para instalar, toque nos três pontinhos do navegador e escolha 'Adicionar à tela inicial' ou 'Instalar app'.");return}eventoInstalacao.prompt();const escolha=await eventoInstalacao.userChoice;if(escolha.outcome==="accepted")esconderBotaoInstalar();eventoInstalacao=null});
-  window.addEventListener("appinstalled",esconderBotaoInstalar);
- async function iniciarApp(){
- await buscarOrcamentosOnline();
- await buscarGastosOnline();
- await buscarMetaOnline();
-
- atualizarTudo();
- atualizarGuardadoSimples();
- await atualizarValorGuardado();
+async function deleteExpenseOnline(id) {
+  return apiFetch(`/api/expenses?id=${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
 }
-  async function verificarLoginSalvo(){if(!APP_TOKEN){fecharApp();atualizarIcones();return}try{abrirApp();await iniciarApp()}catch(erro){console.error("Erro ao iniciar com login salvo:",erro);localStorage.removeItem("app_token");APP_TOKEN="";fecharApp()}}
-  btnSair?.addEventListener("click",function(){const confirmar=confirm("Deseja sair da sua conta?");if(!confirmar)return;localStorage.removeItem("app_token");localStorage.removeItem("app_user_name");APP_TOKEN="";gastos=[];orcamentos={};orcamento=0;fecharApp();if(loginEmailInput)loginEmailInput.value="";if(loginSenhaInput)loginSenhaInput.value="";mostrarMensagemLogin("Você saiu da conta.")});
-  configurarNavegacao();atualizarLabelMes();atualizarIcones();verificarLoginSalvo();
 
-  const metaInput=document.getElementById("metaInput"),btnDefinirMeta=document.getElementById("btnDefinirMeta"),metaValor=document.getElementById("metaValor"),metaAlcancado=document.getElementById("metaAlcancado"),metaStatus=document.getElementById("metaStatus"),metaTexto=document.getElementById("metaTexto"),metaProgressoBarra=document.getElementById("metaProgressoBarra");
- let metaAtual = 0;
+async function fetchBudgets() {
+  const data = await apiFetch("/api/budgets", { headers: authHeaders() });
+  budgets = {};
 
-async function buscarMetaOnline(){
+  (Array.isArray(data) ? data : []).forEach((item) => {
+    budgets[item.month] = Number(item.value) || 0;
+  });
 
-  const resposta = await fetch(
-    `${API_BASE_URL}/api/goals?month=${mesSelecionado}`,
-    {
+  currentBudget = Number(budgets[selectedMonth]) || 0;
+}
+
+async function saveBudget(month, value) {
+  return apiFetch("/api/budgets", {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ month, value: Number(value) })
+  });
+}
+
+async function fetchGoal() {
+  try {
+    const data = await apiFetch(`/api/goals?month=${encodeURIComponent(selectedMonth)}`, {
       headers: authHeaders()
+    });
+
+    if (Array.isArray(data)) {
+      currentGoal = data.length ? Number(data[0].value) || 0 : 0;
+    } else if (data && typeof data === "object") {
+      currentGoal = Number(data.value ?? data.goal?.value ?? 0) || 0;
+    } else {
+      currentGoal = 0;
     }
-  );
-
-  if(!resposta.ok){
-    metaAtual = 0;
-    return;
+  } catch (error) {
+    console.warn("Meta indisponível:", error);
+    currentGoal = Number(localStorage.getItem(`goal_${selectedMonth}`)) || 0;
   }
-
-  const dados = await resposta.json();
-
-  metaAtual = dados.length ? Number(dados[0].value) : 0;
-
-  atualizarMeta();
 }
-  function salvarMetaMes(valor){metasMensais[chaveMetaMes()]=Number(valor)||0;localStorage.setItem("metas_mensais",JSON.stringify(metasMensais))}
-  function atualizarMeta(){if(!metaValor||!metaAlcancado||!metaStatus||!metaTexto||!metaProgressoBarra)return;const meta=metaAtual,guardadoNoMes=Math.max(0,orcamento-calcularTotalGasto()),progresso=meta>0?Math.min(100,guardadoNoMes/meta*100):0;metaValor.textContent=formatarMoeda(meta);metaAlcancado.textContent=formatarMoeda(guardadoNoMes);metaProgressoBarra.style.width=`${progresso}%`;if(meta<=0){metaStatus.textContent="Sem meta";metaTexto.textContent="Defina quanto você quer guardar neste mês. A meta usa a sobra do orçamento depois dos gastos.";return}if(progresso>=100){metaStatus.textContent="Meta batida";metaTexto.textContent=`Você alcançou ${Math.round(progresso)}% da meta. Sobra atual: ${formatarMoeda(guardadoNoMes)}.`;return}metaStatus.textContent=`${Math.round(progresso)}% concluída`;metaTexto.textContent=`Faltam ${formatarMoeda(Math.max(0,meta-guardadoNoMes))} para bater sua meta deste mês.`}
-  btnDefinirMeta?.addEventListener("click",async function(){
 
-  const valor=Number(metaInput.value);
+async function saveGoal(value) {
+  try {
+    const data = await apiFetch("/api/goals", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ month: selectedMonth, value: Number(value) })
+    });
+    localStorage.setItem(`goal_${selectedMonth}`, String(value));
+    return data;
+  } catch (error) {
+    localStorage.setItem(`goal_${selectedMonth}`, String(value));
+    currentGoal = Number(value) || 0;
+    console.warn("Meta salva apenas neste dispositivo:", error);
+    showToast("A meta foi salva neste dispositivo.");
+    return null;
+  }
+}
 
-  if(valor<0){
-    alert("Digite um valor válido para a meta.");
+function getMonthExpenses() {
+  return expenses.filter((expense) => expense.date.startsWith(selectedMonth));
+}
+
+function getTotalExpenses() {
+  return getMonthExpenses().reduce((total, expense) => total + Number(expense.value), 0);
+}
+
+function getCategory(category) {
+  return categoryConfig[category] || categoryConfig.Outros;
+}
+
+function groupCategories() {
+  const total = getTotalExpenses();
+  const grouped = {};
+
+  getMonthExpenses().forEach((expense) => {
+    grouped[expense.category] = (grouped[expense.category] || 0) + Number(expense.value);
+  });
+
+  return Object.entries(grouped)
+    .map(([category, value]) => ({
+      category,
+      value,
+      percentage: total > 0 ? (value / total) * 100 : 0,
+      ...getCategory(category)
+    }))
+    .sort((a, b) => b.value - a.value);
+}
+
+function renderExpenses() {
+  if (!elements.listaGastos) return;
+
+  const ordered = [...getMonthExpenses()].sort((a, b) => {
+    if (a.date === b.date) return String(b.id).localeCompare(String(a.id));
+    return b.date.localeCompare(a.date);
+  });
+
+  const visibleExpenses = currentView === "home" ? ordered.slice(0, 4) : ordered;
+
+  if (elements.tituloListaGastos) {
+    elements.tituloListaGastos.textContent = currentView === "home" ? "Últimos gastos" : "Todos os gastos";
+  }
+  if (elements.subtituloListaGastos) {
+    elements.subtituloListaGastos.textContent = currentView === "home"
+      ? "Movimentações mais recentes"
+      : `${ordered.length} movimentação${ordered.length === 1 ? "" : "ões"} em ${monthLabel(selectedMonth)}`;
+  }
+
+  elements.listaGastos.innerHTML = "";
+
+  if (!visibleExpenses.length) {
+    elements.listaGastos.innerHTML = '<li class="mensagem-vazia">Nenhum gasto cadastrado neste mês.</li>';
     return;
   }
 
-  await salvarMetaOnline(valor);
+  visibleExpenses.forEach((expense) => {
+    const config = getCategory(expense.category);
+    const item = document.createElement("li");
+    item.className = "gasto-item";
+    item.innerHTML = `
+      <span class="expense-icon" style="background:${config.color}18;color:${config.color}">${config.icon}</span>
+      <div class="gasto-info">
+        <strong>${escapeHtml(expense.description)}</strong>
+        <span>${formatDate(expense.date)} · ${escapeHtml(expense.category)}</span>
+      </div>
+      <div class="expense-side">
+        <p class="gasto-valor">- ${formatCurrency(expense.value)}</p>
+        <button class="btn-excluir" type="button" aria-label="Excluir ${escapeHtml(expense.description)}" data-expense-id="${escapeHtml(String(expense.id))}">
+          <i data-lucide="trash-2"></i>
+        </button>
+      </div>
+    `;
+    elements.listaGastos.appendChild(item);
+  });
 
-await buscarMetaOnline();
+  refreshIcons();
+}
 
-metaInput.value="";
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
-});
-  const atualizarTudoOriginal=atualizarTudo;atualizarTudo=function(){atualizarTudoOriginal();atualizarMeta()};
-  [btnAdicionarOrcamento,btnRetirarOrcamento,btnDefinirOrcamento].forEach(botao=>botao?.addEventListener("click",()=>setTimeout(atualizarMeta,900)));
-  function selecionarGuia(view,targetId){const app=document.getElementById("appConteudo");app?.classList.add("guia-ativa");document.querySelectorAll("[data-view]").forEach(secao=>{secao.classList.toggle("guia-oculta",secao.dataset.view!==view)});document.querySelectorAll(".nav-item").forEach(item=>item.classList.toggle("active",item.dataset.viewTarget===view));const destino=document.getElementById(targetId)||document.querySelector(`[data-view='${view}']`);setTimeout(()=>destino?.scrollIntoView({behavior:"smooth",block:"start"}),30);if(view==="reports"&&categoriaChart){setTimeout(()=>categoriaChart.resize(),120)}atualizarIcones()}
-  document.querySelectorAll("[data-view-target]").forEach(botao=>{botao.addEventListener("click",function(){selecionarGuia(botao.dataset.viewTarget,botao.dataset.scrollTarget)})});
-  selecionarGuia("home","inicioSection");
-  atualizarMeta();
+function updateSummary() {
+  const total = getTotalExpenses();
+  const balance = currentBudget - total;
+  const budgetBase = currentBudget > 0 ? currentBudget : 0;
+  const expensePercent = budgetBase > 0 ? (total / budgetBase) * 100 : 0;
+  const balancePercent = budgetBase > 0 ? Math.max(0, balance / budgetBase) * 100 : 0;
 
-  
-  
-  atualizarMeta();
+  elements.orcamentoResumo.textContent = formatCurrency(currentBudget);
+  elements.orcamentoTotal.textContent = formatCurrency(currentBudget);
+  elements.totalGasto.textContent = formatCurrency(total);
+  elements.resumoGastos.textContent = formatCurrency(total);
+  elements.resumoDisponivel.textContent = formatCurrency(balance);
+
+  elements.percentOrcamentoBar.style.width = currentBudget > 0 ? "100%" : "0%";
+  elements.percentGastoBar.style.width = `${Math.min(100, Math.max(0, expensePercent))}%`;
+  elements.percentSaldoBar.style.width = `${Math.min(100, Math.max(0, balancePercent))}%`;
+  elements.orcamentoPercentText.textContent = currentBudget > 0 ? "100% do orçamento" : "Defina seu orçamento";
+  elements.gastoPercentText.textContent = currentBudget > 0 ? `${Math.round(expensePercent)}% do orçamento` : "Sem orçamento definido";
+  elements.saldoPercentText.textContent = currentBudget > 0 ? `${Math.round(balancePercent)}% do orçamento` : "Defina seu orçamento";
+
+  if (balance >= 0) {
+    elements.textoSaldo.textContent = "Saldo disponível";
+    elements.saldoRestante.textContent = formatCurrency(balance);
+    elements.saldoBox.classList.remove("negativo");
+  } else {
+    elements.textoSaldo.textContent = "Orçamento excedido";
+    elements.saldoRestante.textContent = `- ${formatCurrency(Math.abs(balance))}`;
+    elements.saldoBox.classList.add("negativo");
+  }
+
+  if (elements.chartTotal) elements.chartTotal.textContent = formatCompactCurrency(total);
+}
+
+function updateGoal() {
+  const savedThisMonth = Math.max(0, currentBudget - getTotalExpenses());
+  const percentage = currentGoal > 0 ? Math.min(100, (savedThisMonth / currentGoal) * 100) : 0;
+  const missing = Math.max(0, currentGoal - savedThisMonth);
+
+  elements.metaValor.textContent = formatCurrency(currentGoal);
+  elements.metaAlcancado.textContent = formatCurrency(savedThisMonth);
+  elements.metaProgressoBarra.style.width = `${percentage}%`;
+  elements.metaProgressoPagina.style.width = `${percentage}%`;
+  elements.metaResumoPagina.textContent = `${Math.round(percentage)}%`;
+
+  if (currentGoal <= 0) {
+    elements.metaStatus.textContent = "Sem meta definida";
+    elements.metaTexto.textContent = "Defina uma meta para este mês.";
+  } else if (percentage >= 100) {
+    elements.metaStatus.textContent = "Meta alcançada 🎉";
+    elements.metaTexto.textContent = `Você guardou ${formatCurrency(savedThisMonth)}.`;
+  } else {
+    elements.metaStatus.textContent = `${Math.round(percentage)}% da meta`;
+    elements.metaTexto.textContent = `Faltam ${formatCurrency(missing)}.`;
+  }
+}
+
+function renderCategories() {
+  const categories = groupCategories();
+  elements.dashboardCategorias.innerHTML = "";
+
+  if (!categories.length) {
+    elements.dashboardCategorias.innerHTML = '<p class="mensagem-vazia">Sem gastos para exibir.</p>';
+    updateChart([]);
+    return;
+  }
+
+  categories.slice(0, 6).forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "category-row";
+    row.innerHTML = `
+      <span class="category-dot" style="background:${item.color}"></span>
+      <strong>${escapeHtml(item.category)}</strong>
+      <span class="category-values"><b>${formatCurrency(item.value)}</b><span>${Math.round(item.percentage)}%</span></span>
+    `;
+    elements.dashboardCategorias.appendChild(row);
+  });
+
+  updateChart(categories);
+}
+
+function updateChart(categories) {
+  if (!elements.categoriaChart || !window.Chart) return;
+
+  const hasData = categories.length > 0;
+  const labels = hasData ? categories.map((item) => item.category) : ["Sem gastos"];
+  const values = hasData ? categories.map((item) => item.value) : [1];
+  const colors = hasData ? categories.map((item) => item.color) : ["#f2e8eb"];
+
+  if (!categoryChart) {
+    categoryChart = new Chart(elements.categoriaChart, {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor: colors,
+          borderColor: "#ffffff",
+          borderWidth: 4,
+          hoverOffset: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "63%",
+        animation: { duration: 450 },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                return hasData ? `${context.label}: ${formatCurrency(context.raw)}` : "Sem gastos";
+              }
+            }
+          }
+        }
+      }
+    });
+    return;
+  }
+
+  categoryChart.data.labels = labels;
+  categoryChart.data.datasets[0].data = values;
+  categoryChart.data.datasets[0].backgroundColor = colors;
+  categoryChart.update();
+}
+
+async function updateSavedTotal() {
+  if (!elements.valorGuardadoTotal) return;
+
+  try {
+    const allExpenses = await fetchAllExpenses();
+    let savedTotal = 0;
+
+    Object.entries(budgets).forEach(([month, budget]) => {
+      const monthExpenses = allExpenses
+        .filter((expense) => expense.date.startsWith(month))
+        .reduce((total, expense) => total + Number(expense.value), 0);
+
+      const remaining = Number(budget) - monthExpenses;
+      if (remaining > 0) savedTotal += remaining;
+    });
+
+    elements.valorGuardadoTotal.textContent = formatCurrency(savedTotal);
+  } catch (error) {
+    console.warn("Não foi possível calcular o total guardado:", error);
+    elements.valorGuardadoTotal.textContent = formatCurrency(0);
+  }
+}
+
+function updateAll() {
+  updateSummary();
+  updateGoal();
+  renderExpenses();
+  renderCategories();
+  elements.mesSelecionado.setAttribute("aria-label", `Mês selecionado: ${monthLabel(selectedMonth)}`);
+  refreshIcons();
+}
+
+async function addExpense(event) {
+  event.preventDefault();
+
+  const expense = {
+    description: elements.descricao.value.trim(),
+    value: Number(elements.valor.value),
+    category: elements.categoria.value,
+    date: elements.data.value
+  };
+
+  if (!expense.description || expense.value <= 0 || !expense.category || !expense.date) {
+    showToast("Preencha todos os dados do gasto.");
+    return;
+  }
+
+  const submitButton = elements.formGasto.querySelector('button[type="submit"]');
+  setButtonLoading(submitButton, true, "Salvando...");
+
+  try {
+    await createExpense(expense);
+    await fetchExpenses();
+    updateAll();
+    await updateSavedTotal();
+    elements.formGasto.reset();
+    elements.data.value = new Date().toISOString().slice(0, 10);
+    showToast("Gasto salvo com sucesso.");
+  } catch (error) {
+    console.error("Erro ao salvar gasto:", error);
+    showToast(error.message || "Não foi possível salvar o gasto.");
+  } finally {
+    setButtonLoading(submitButton, false);
+  }
+}
+
+async function deleteExpense(id) {
+  if (!confirm("Deseja excluir este gasto?")) return;
+
+  try {
+    await deleteExpenseOnline(id);
+    await fetchExpenses();
+    updateAll();
+    await updateSavedTotal();
+    showToast("Gasto excluído.");
+  } catch (error) {
+    console.error("Erro ao excluir gasto:", error);
+    showToast(error.message || "Não foi possível excluir o gasto.");
+  }
+}
+
+async function changeBudget(mode) {
+  const value = Number(elements.orcamentoInput.value);
+
+  if (value < 0 || (!value && mode !== "set")) {
+    showToast("Digite um valor válido.");
+    return;
+  }
+
+  let nextBudget = currentBudget;
+  if (mode === "add") nextBudget += value;
+  if (mode === "remove") nextBudget = Math.max(0, nextBudget - value);
+  if (mode === "set") nextBudget = value || 0;
+
+  const buttonMap = {
+    add: elements.btnAdicionarOrcamento,
+    remove: elements.btnRetirarOrcamento,
+    set: elements.btnDefinirOrcamento
+  };
+  const button = buttonMap[mode];
+  setButtonLoading(button, true, "Salvando...");
+
+  try {
+    await saveBudget(selectedMonth, nextBudget);
+    await fetchBudgets();
+    elements.orcamentoInput.value = "";
+    updateAll();
+    await updateSavedTotal();
+    showToast("Orçamento atualizado.");
+  } catch (error) {
+    console.error("Erro ao salvar orçamento:", error);
+    showToast(error.message || "Não foi possível salvar o orçamento.");
+  } finally {
+    setButtonLoading(button, false);
+  }
+}
+
+async function changeGoal() {
+  const value = Number(elements.metaInput.value);
+
+  if (value < 0 || Number.isNaN(value)) {
+    showToast("Digite um valor válido para a meta.");
+    return;
+  }
+
+  setButtonLoading(elements.btnDefinirMeta, true, "Salvando...");
+
+  try {
+    await saveGoal(value);
+    currentGoal = value;
+    await fetchGoal();
+    elements.metaInput.value = "";
+    updateGoal();
+    showToast("Meta atualizada.");
+  } catch (error) {
+    console.error("Erro ao salvar meta:", error);
+    showToast(error.message || "Não foi possível salvar a meta.");
+  } finally {
+    setButtonLoading(elements.btnDefinirMeta, false);
+  }
+}
+
+function setView(view, targetId = "") {
+  currentView = view;
+
+  $$('[data-view]').forEach((section) => {
+    const views = section.dataset.view.split(/\s+/);
+    section.classList.toggle("view-hidden", !views.includes(view));
+  });
+
+  $$(".nav-item").forEach((item) => {
+    item.classList.toggle("active", item.dataset.viewTarget === view);
+  });
+
+  renderExpenses();
+
+  if (view === "reports" && categoryChart) {
+    setTimeout(() => categoryChart.resize(), 80);
+  }
+
+  const target = targetId ? document.getElementById(targetId) : null;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  if (target && view !== "home") {
+    setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  }
+
+  if (targetId === "gastoSection") {
+    setTimeout(() => elements.descricao?.focus(), 420);
+  }
+
+  refreshIcons();
+}
+
+function configureNavigation() {
+  $$('[data-view-target]').forEach((button) => {
+    button.addEventListener("click", () => {
+      setView(button.dataset.viewTarget, button.dataset.scrollTarget || "");
+    });
+  });
+}
+
+function isStandalone() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function updateInstallButtons() {
+  const shouldHide = isStandalone();
+  elements.btnInstallApp?.classList.toggle("oculto", shouldHide || !installPrompt);
+}
+
+async function requestInstall() {
+  if (isStandalone()) {
+    showToast("O aplicativo já está instalado.");
+    return;
+  }
+
+  if (!installPrompt) {
+    showToast("No navegador, use “Adicionar à tela inicial” ou “Instalar app”.");
+    return;
+  }
+
+  installPrompt.prompt();
+  const choice = await installPrompt.userChoice;
+  installPrompt = null;
+  updateInstallButtons();
+
+  if (choice.outcome === "accepted") showToast("Aplicativo instalado.");
+}
+
+async function initializeApp() {
+  elements.mesSelecionado.value = selectedMonth;
+
+  try {
+    await Promise.all([fetchBudgets(), fetchExpenses(), fetchGoal()]);
+    updateAll();
+    await updateSavedTotal();
+  } catch (error) {
+    console.error("Erro ao iniciar aplicativo:", error);
+    if (appToken) showToast(error.message || "Não foi possível carregar os dados.");
+  }
+}
+
+async function checkSavedLogin() {
+  if (!appToken) {
+    closeApp();
+    return;
+  }
+
+  openApp();
+  await initializeApp();
+}
+
+function bindEvents() {
+  elements.btnMostrarCadastro?.addEventListener("click", () => {
+    elements.loginForm.classList.add("oculto");
+    elements.cadastroForm.classList.remove("oculto");
+    showLoginMessage("");
+  });
+
+  elements.btnMostrarLogin?.addEventListener("click", () => {
+    elements.cadastroForm.classList.add("oculto");
+    elements.loginForm.classList.remove("oculto");
+    showLoginMessage("");
+  });
+
+  elements.btnLogin?.addEventListener("click", loginUser);
+  elements.btnCadastrar?.addEventListener("click", registerUser);
+  elements.loginSenha?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") loginUser();
+  });
+  elements.cadastroConfirmarSenha?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") registerUser();
+  });
+
+  elements.formGasto?.addEventListener("submit", addExpense);
+
+  elements.listaGastos?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-expense-id]");
+    if (button) deleteExpense(button.dataset.expenseId);
+  });
+
+  elements.btnAdicionarOrcamento?.addEventListener("click", () => changeBudget("add"));
+  elements.btnRetirarOrcamento?.addEventListener("click", () => changeBudget("remove"));
+  elements.btnDefinirOrcamento?.addEventListener("click", () => changeBudget("set"));
+  elements.btnDefinirMeta?.addEventListener("click", changeGoal);
+
+  elements.mesSelecionado?.addEventListener("change", async () => {
+    if (!elements.mesSelecionado.value) return;
+    selectedMonth = elements.mesSelecionado.value;
+
+    try {
+      await Promise.all([fetchBudgets(), fetchExpenses(), fetchGoal()]);
+      updateAll();
+      await updateSavedTotal();
+    } catch (error) {
+      console.error("Erro ao trocar o mês:", error);
+      showToast(error.message || "Não foi possível trocar o mês.");
+    }
+  });
+
+  elements.btnSair?.addEventListener("click", () => {
+    if (!confirm("Deseja sair da sua conta?")) return;
+    clearSession();
+    closeApp();
+    elements.loginSenha.value = "";
+    showLoginMessage("Você saiu da conta.");
+  });
+
+  elements.btnInstallApp?.addEventListener("click", requestInstall);
+  elements.btnInstalarPerfil?.addEventListener("click", requestInstall);
+
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    installPrompt = event;
+    updateInstallButtons();
+  });
+
+  window.addEventListener("appinstalled", () => {
+    installPrompt = null;
+    updateInstallButtons();
+  });
+}
+
+function start() {
+  elements.data.value = new Date().toISOString().slice(0, 10);
+  elements.mesSelecionado.value = selectedMonth;
+  configureNavigation();
+  bindEvents();
+  setView("home");
+  updateInstallButtons();
+  refreshIcons();
+  checkSavedLogin();
+}
+
+start();

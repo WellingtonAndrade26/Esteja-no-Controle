@@ -1,13 +1,13 @@
 {
-  "name": "Controle da Letícia",
+  "name": "Esteja no Controle",
   "short_name": "Controle",
-  "description": "App para controle de gastos mensais.",
-  "start_url": "./",
+  "description": "App para organizar orçamento, gastos e metas financeiras.",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#fdf2f8",
-  "theme_color": "#ec4899",
-  "orientation": "portrait",
+  "background_color": "#fff9fa",
+  "theme_color": "#ff5c7d",
+  "orientation": "portrait-primary",
   "icons": [
     {
       "src": "./images/icon-192.png",
