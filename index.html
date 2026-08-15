@@ -1,478 +1,272 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#ff5c7d">
-  <meta name="description" content="Controle financeiro pessoal simples, bonito e organizado.">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Controle">
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#020b15" />
+  <meta name="description" content="Esteja no Controle — planejamento financeiro pessoal com metas, automações, cartões e IA financeira." />
+  <meta name="application-name" content="Esteja no Controle" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Esteja no Controle" />
   <title>Esteja no Controle</title>
-
-  <link rel="manifest" href="./manifest.json">
-  <link rel="apple-touch-icon" href="./images/icon-192.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./style.css?v=9">
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="./assets/icon-192.png" />
+  <link rel="stylesheet" href="./css/styles.css" />
 </head>
-<body>
-  <section id="loginBox" class="login-screen" aria-labelledby="loginTitulo">
-    <div class="login-decoration login-decoration-one"></div>
-    <div class="login-decoration login-decoration-two"></div>
+<body data-theme="dark">
+  <noscript>Este aplicativo precisa de JavaScript habilitado.</noscript>
 
-    <div class="login-card">
-      <div class="login-brand">
+  <section class="auth-screen" id="authScreen" aria-label="Acesso">
+    <div class="auth-shell">
+      <div class="brand brand--auth">
         <div class="brand-mark" aria-hidden="true">
-          <span></span><span></span><span></span>
+          <span class="bar b1"></span><span class="bar b2"></span><span class="bar b3"></span>
+          <span class="brand-check">✓</span>
         </div>
         <div>
-          <small>Organize sua vida financeira</small>
-          <h1 id="loginTitulo">Esteja no <strong>Controle</strong></h1>
+          <h1>Esteja no <span>Controle</span></h1>
+          <p>Planejamento financeiro inteligente, seguro e simples.</p>
         </div>
       </div>
 
-      <div id="loginForm" class="auth-form">
-        <div class="auth-heading">
-          <h2>Bem-vindo de volta</h2>
-          <p>Entre para acompanhar orçamento, gastos e metas.</p>
+      <div class="auth-card">
+        <div class="auth-tabs" role="tablist" aria-hidden="true">
+          <button class="auth-tab is-active" data-auth-mode="login" tabindex="-1">Entrar</button>
+          <button class="auth-tab" data-auth-mode="signup" tabindex="-1">Criar conta</button>
         </div>
 
-        <label class="field">
-          <span>E-mail</span>
-          <div class="input-shell">
-            <i data-lucide="mail"></i>
-            <input type="email" id="loginEmail" placeholder="voce@email.com" autocomplete="email">
+        <form id="authForm" autocomplete="on">
+          <div class="field" id="nameField" hidden>
+            <label for="authName">Nome</label>
+            <input id="authName" name="name" type="text" placeholder="Seu nome" />
           </div>
-        </label>
-
-        <label class="field">
-          <span>Senha</span>
-          <div class="input-shell">
-            <i data-lucide="lock-keyhole"></i>
-            <input type="password" id="loginSenha" placeholder="Sua senha" autocomplete="current-password">
+          <div class="field">
+            <label for="authEmail">E-mail</label>
+            <input id="authEmail" name="email" type="email" placeholder="voce@email.com" required />
           </div>
-        </label>
-
-        <button id="btnLogin" class="primary-button" type="button">
-          <span>Entrar</span>
-          <i data-lucide="arrow-right"></i>
+          <div class="field">
+            <label for="authPassword">Senha</label>
+            <div class="input-with-action">
+              <input id="authPassword" name="password" type="password" placeholder="••••••••" minlength="8" required />
+              <button type="button" class="icon-button" id="togglePassword" aria-label="Mostrar senha">◉</button>
+            </div>
+          </div>
+          <div class="field" id="confirmPasswordField" hidden>
+            <label for="authConfirmPassword">Confirmar senha</label>
+            <div class="input-with-action">
+              <input id="authConfirmPassword" name="confirmPassword" type="password" placeholder="Digite a senha novamente" minlength="8" />
+              <button type="button" class="icon-button" id="toggleConfirmPassword" aria-label="Mostrar confirmação de senha">◉</button>
+            </div>
+            <small class="field-help password-match-hint" id="passwordMatchHint"></small>
+          </div>
+          <div class="auth-help-row"><button class="auth-forgot" id="forgotPassword" type="button">Esqueci minha senha</button></div>
+          <button class="primary-button auth-submit" type="submit" id="authSubmit">Entrar</button>
+        </form>
+        <button class="auth-mode-switch" id="authModeSwitch" type="button">Criar conta</button>
+        <div class="auth-divider"><span>ou entrar com</span></div>
+        <button class="biometric-button" id="demoLogin" type="button" aria-label="Entrar no modo demonstração">
+          <span class="fingerprint" aria-hidden="true">◎</span>
         </button>
-        <button id="btnMostrarCadastro" class="link-button" type="button">Criar uma conta</button>
+        <p class="auth-note">Toque na digital para entrar no modo demonstração. Com Supabase configurado, os dados ficam sincronizados na nuvem.</p>
       </div>
 
-      <div id="cadastroForm" class="auth-form oculto">
-        <div class="auth-heading">
-          <h2>Crie sua conta</h2>
-          <p>Comece agora seu controle financeiro.</p>
-        </div>
-
-        <label class="field">
-          <span>Nome</span>
-          <div class="input-shell">
-            <i data-lucide="user-round"></i>
-            <input type="text" id="cadastroNome" placeholder="Seu nome" autocomplete="name">
-          </div>
-        </label>
-
-        <label class="field">
-          <span>E-mail</span>
-          <div class="input-shell">
-            <i data-lucide="mail"></i>
-            <input type="email" id="cadastroEmail" placeholder="voce@email.com" autocomplete="email">
-          </div>
-        </label>
-
-        <label class="field">
-          <span>Senha</span>
-          <div class="input-shell">
-            <i data-lucide="lock-keyhole"></i>
-            <input type="password" id="cadastroSenha" placeholder="Crie uma senha" autocomplete="new-password">
-          </div>
-        </label>
-
-        <label class="field">
-          <span>Confirmar senha</span>
-          <div class="input-shell">
-            <i data-lucide="shield-check"></i>
-            <input type="password" id="cadastroConfirmarSenha" placeholder="Repita a senha" autocomplete="new-password">
-          </div>
-        </label>
-
-        <button id="btnCadastrar" class="primary-button" type="button">
-          <span>Criar conta</span>
-          <i data-lucide="sparkles"></i>
-        </button>
-        <button id="btnMostrarLogin" class="link-button" type="button">Já tenho uma conta</button>
+      <div class="security-row">
+        <span>◈ Proteção por conta</span><span>☁ Sincronização na nuvem</span><span>▣ Controle de privacidade</span>
       </div>
-
-      <small id="loginMensagem" class="form-message" role="status" aria-live="polite"></small>
     </div>
   </section>
 
-  <div id="appConteudo" class="app oculto">
-    <header class="app-header" id="inicioSection" data-view="home">
-      <div class="brand-lockup">
-        <div class="brand-mark brand-mark-small" aria-hidden="true">
-          <span></span><span></span><span></span>
-        </div>
-        <div class="brand-copy">
-          <h1>Esteja no Controle</h1>
-          <p id="boasVindasBanner">Sua vida financeira, organizada 💗</p>
-        </div>
+  <div class="app-shell" id="appShell" hidden>
+    <aside class="desktop-rail" aria-label="Navegação principal">
+      <div class="mini-brand">
+        <div class="brand-mark brand-mark--small"><span class="bar b1"></span><span class="bar b2"></span><span class="bar b3"></span><span class="brand-check">✓</span></div>
+        <strong>Controle</strong>
       </div>
-
-      <div class="header-actions">
-        <button id="btnInstallApp" class="icon-button oculto" type="button" aria-label="Instalar aplicativo">
-          <i data-lucide="download"></i>
-        </button>
-        <button class="icon-button notification-button" type="button" aria-label="Notificações">
-          <i data-lucide="bell"></i>
-          <span aria-hidden="true"></span>
-        </button>
+      <nav id="desktopNav"></nav>
+      <div class="rail-bottom">
+        <button class="rail-action" data-open-settings>⚙ <span>Configurações</span></button>
+        <button class="rail-action" id="logoutDesktop">↪ <span>Sair</span></button>
       </div>
-    </header>
+    </aside>
 
-    <main>
-      <section class="month-toolbar" data-view="home expenses reports goal">
-        <label class="month-select" for="mesSelecionado">
-          <i data-lucide="calendar-days"></i>
-          <input type="month" id="mesSelecionado">
-          <i data-lucide="chevron-down"></i>
-        </label>
-      </section>
-
-      <section class="overview-grid" data-view="home">
-        <article class="metric-card metric-budget">
-          <div class="metric-topline">
-            <span class="metric-icon"><i data-lucide="wallet-cards"></i></span>
-            <div>
-              <small>Orçamento do mês</small>
-              <strong id="orcamentoResumo">R$ 0,00</strong>
-            </div>
-          </div>
-          <p id="orcamentoPercentText">100% do orçamento</p>
-          <div class="mini-progress"><span id="percentOrcamentoBar"></span></div>
-        </article>
-
-        <article class="metric-card metric-expenses">
-          <div class="metric-topline">
-            <span class="metric-icon"><i data-lucide="shopping-cart"></i></span>
-            <div>
-              <small>Gastos totais</small>
-              <strong id="totalGasto">R$ 0,00</strong>
-            </div>
-          </div>
-          <p id="gastoPercentText">0% do orçamento</p>
-          <div class="mini-progress"><span id="percentGastoBar"></span></div>
-        </article>
-
-        <article class="metric-card metric-balance saldo-box">
-          <div class="metric-topline">
-            <span class="metric-icon"><i data-lucide="banknote"></i></span>
-            <div>
-              <small id="textoSaldo">Saldo disponível</small>
-              <strong id="saldoRestante">R$ 0,00</strong>
-            </div>
-          </div>
-          <p id="saldoPercentText">0% do orçamento</p>
-          <div class="mini-progress"><span id="percentSaldoBar"></span></div>
-        </article>
-
-        <article class="metric-card metric-savings">
-          <div class="metric-topline">
-            <span class="metric-icon"><i data-lucide="piggy-bank"></i></span>
-            <div>
-              <small>Total guardado</small>
-              <strong id="valorGuardadoTotal">R$ 0,00</strong>
-            </div>
-          </div>
-          <p>Seu patrimônio acumulado <i data-lucide="trending-up"></i></p>
-        </article>
-      </section>
-
-      <section class="card goal-summary-card" id="metaSection" data-view="home">
-        <div class="section-title-row">
-          <div class="section-heading-with-icon">
-            <span class="section-icon pink"><i data-lucide="target"></i></span>
-            <div>
-              <h2>Meta do mês</h2>
-              <p>Quanto você quer guardar</p>
-            </div>
-          </div>
-          <strong class="goal-pill" id="metaValor">R$ 0,00</strong>
-        </div>
-
-        <div class="goal-progress"><span id="metaProgressoBarra"></span></div>
-        <div class="goal-footer">
-          <strong id="metaStatus">Sem meta definida</strong>
-          <span id="metaTexto">Defina uma meta para este mês.</span>
-        </div>
-        <span id="metaAlcancado" class="sr-only">R$ 0,00</span>
-      </section>
-
-      <section class="card chart-card" id="relatoriosSection" data-view="home reports">
-        <div class="section-title-row">
-          <div>
-            <h2>Gastos por categoria</h2>
-            <p>Veja para onde seu dinheiro está indo</p>
-          </div>
-          <button class="text-action" type="button" data-view-target="reports" data-scroll-target="relatoriosSection">
-            Ver detalhes <i data-lucide="chevron-right"></i>
-          </button>
-        </div>
-
-        <div class="chart-layout">
-          <div class="chart-wrap">
-            <canvas id="categoriaChart" aria-label="Gráfico de gastos por categoria"></canvas>
-            <div class="chart-center">
-              <strong id="chartTotal">R$ 0</strong>
-              <small>Total</small>
-            </div>
-          </div>
-          <div id="dashboardCategorias" class="category-list"></div>
-        </div>
-      </section>
-
-      <section class="card expenses-card" id="listaSection" data-view="home expenses">
-        <div class="section-title-row">
-          <div>
-            <h2 id="tituloListaGastos">Últimos gastos</h2>
-            <p id="subtituloListaGastos">Movimentações mais recentes</p>
-          </div>
-          <button class="text-action" type="button" data-view-target="expenses" data-scroll-target="listaSection">
-            Ver todos <i data-lucide="chevron-right"></i>
-          </button>
-        </div>
-        <ul id="listaGastos" class="expense-list"></ul>
-      </section>
-
-      <button class="floating-add-button" type="button" data-view="home" data-view-target="expenses" data-scroll-target="gastoSection">
-        <span><i data-lucide="plus"></i></span>
-        Adicionar gasto
-      </button>
-
-      <section class="view-heading" data-view="expenses">
-        <span class="view-heading-icon"><i data-lucide="receipt-text"></i></span>
+    <div class="app-column">
+      <header class="topbar">
         <div>
-          <h2>Controle de gastos</h2>
-          <p>Cadastre e acompanhe suas despesas.</p>
+          <p class="eyebrow" id="todayLabel"></p>
+          <h2 id="pageTitle">Início</h2>
         </div>
-      </section>
-
-      <section class="card form-card" id="gastoSection" data-view="expenses">
-        <div class="section-title-row">
-          <div>
-            <h2>Novo gasto</h2>
-            <p>Preencha os dados da despesa</p>
-          </div>
-          <span class="card-badge"><i data-lucide="plus"></i> Novo</span>
+        <div class="topbar-actions">
+          <button class="page-action-button" id="pageAction" type="button" aria-label="Ação da página">◌</button>
+          <button class="icon-button top-icon top-utility" id="themeToggle" aria-label="Alternar tema">☾</button>
+          <button class="avatar-button top-utility" data-open-settings aria-label="Abrir configurações"><span id="avatarInitials">WA</span></button>
         </div>
+      </header>
+      <div class="network-status" id="networkStatus" hidden role="status" aria-live="polite"><span>◌</span><strong>Você está offline.</strong><small>Alterações locais continuam disponíveis e a nuvem sincroniza quando a internet voltar.</small></div>
 
-        <form id="formGasto" class="expense-form">
-          <label class="field">
-            <span>Descrição</span>
-            <div class="input-shell">
-              <i data-lucide="pencil-line"></i>
-              <input type="text" id="descricao" placeholder="Mercado, Uber, conta de luz..." maxlength="80" required>
-            </div>
-          </label>
+      <main class="main-content" id="mainContent">
+        <section class="page is-active" id="page-dashboard" data-page="dashboard"></section>
+        <section class="page" id="page-transactions" data-page="transactions"></section>
+        <section class="page" id="page-planning" data-page="planning"></section>
+        <section class="page" id="page-cards" data-page="cards"></section>
+        <section class="page" id="page-ai" data-page="ai"></section>
+        <section class="page" id="page-reports" data-page="reports"></section>
+        <section class="page" id="page-settings" data-page="settings"></section>
+      </main>
 
-          <div class="form-row">
-            <label class="field">
-              <span>Valor</span>
-              <div class="input-shell money-input">
-                <b>R$</b>
-                <input type="number" id="valor" placeholder="0,00" step="0.01" min="0.01" inputmode="decimal" required>
-              </div>
-            </label>
-
-            <label class="field">
-              <span>Data</span>
-              <div class="input-shell">
-                <i data-lucide="calendar"></i>
-                <input type="date" id="data" required>
-              </div>
-            </label>
-          </div>
-
-          <label class="field">
-            <span>Categoria</span>
-            <div class="input-shell select-shell">
-              <i data-lucide="tags"></i>
-              <select id="categoria" required>
-                <option value="Mercado">Mercado</option>
-                <option value="Alimentação">Alimentação</option>
-                <option value="Transporte">Transporte</option>
-                <option value="Casa">Casa</option>
-                <option value="Contas">Contas</option>
-                <option value="Saúde">Saúde</option>
-                <option value="Lazer">Lazer</option>
-                <option value="Outros">Outros</option>
-              </select>
-            </div>
-          </label>
-
-          <button class="primary-button" type="submit">
-            <i data-lucide="check"></i>
-            <span>Salvar gasto</span>
-          </button>
-        </form>
-      </section>
-
-      <section class="view-heading" data-view="reports">
-        <span class="view-heading-icon"><i data-lucide="chart-no-axes-combined"></i></span>
-        <div>
-          <h2>Relatórios</h2>
-          <p>Entenda o comportamento das suas finanças.</p>
-        </div>
-      </section>
-
-      <section class="report-summary" data-view="reports">
-        <article class="report-stat">
-          <span><i data-lucide="wallet"></i></span>
-          <small>Orçamento</small>
-          <strong id="orcamentoTotal">R$ 0,00</strong>
-        </article>
-        <article class="report-stat">
-          <span><i data-lucide="receipt"></i></span>
-          <small>Gastos</small>
-          <strong id="resumoGastos">R$ 0,00</strong>
-        </article>
-        <article class="report-stat">
-          <span><i data-lucide="circle-dollar-sign"></i></span>
-          <small>Disponível</small>
-          <strong id="resumoDisponivel">R$ 0,00</strong>
-        </article>
-      </section>
-
-      <section class="view-heading" data-view="goal">
-        <span class="view-heading-icon"><i data-lucide="target"></i></span>
-        <div>
-          <h2>Metas e orçamento</h2>
-          <p>Planeje antes de gastar.</p>
-        </div>
-      </section>
-
-      <section class="card budget-card" id="orcamentoSection" data-view="goal">
-        <div class="section-title-row">
-          <div>
-            <h2>Orçamento mensal</h2>
-            <p>Defina o valor disponível para o mês</p>
-          </div>
-          <span class="section-icon peach"><i data-lucide="wallet-minimal"></i></span>
-        </div>
-
-        <label class="field compact-field">
-          <span>Valor do orçamento</span>
-          <div class="input-shell money-input">
-            <b>R$</b>
-            <input type="number" id="orcamentoInput" placeholder="Ex: 2.500,00" min="0" step="0.01" inputmode="decimal">
-          </div>
-        </label>
-
-        <div class="budget-buttons">
-          <button id="btnAdicionarOrcamento" class="soft-button" type="button"><i data-lucide="plus"></i> Adicionar</button>
-          <button id="btnRetirarOrcamento" class="soft-button" type="button"><i data-lucide="minus"></i> Retirar</button>
-          <button id="btnDefinirOrcamento" class="primary-button compact" type="button"><i data-lucide="check"></i> Definir</button>
-        </div>
-      </section>
-
-      <section class="card goal-editor-card" data-view="goal">
-        <div class="section-title-row">
-          <div>
-            <h2>Meta para guardar</h2>
-            <p>Use a sobra do orçamento para alcançar sua meta</p>
-          </div>
-          <span class="section-icon lilac"><i data-lucide="sparkles"></i></span>
-        </div>
-
-        <div class="goal-editor-highlight">
-          <small>Progresso atual</small>
-          <strong id="metaResumoPagina">0%</strong>
-          <div class="goal-progress"><span id="metaProgressoPagina"></span></div>
-        </div>
-
-        <label class="field compact-field">
-          <span>Valor da meta</span>
-          <div class="input-shell money-input">
-            <b>R$</b>
-            <input type="number" id="metaInput" placeholder="Ex: 600,00" min="0" step="0.01" inputmode="decimal">
-          </div>
-        </label>
-
-        <button id="btnDefinirMeta" class="primary-button" type="button">
-          <i data-lucide="target"></i>
-          <span>Salvar meta</span>
-        </button>
-      </section>
-
-      <section class="view-heading" data-view="profile">
-        <span class="view-heading-icon"><i data-lucide="user-round"></i></span>
-        <div>
-          <h2>Seu perfil</h2>
-          <p>Conta e preferências do aplicativo.</p>
-        </div>
-      </section>
-
-      <section class="card profile-card" id="perfilSection" data-view="profile">
-        <div class="profile-avatar"><i data-lucide="user-round"></i></div>
-        <div class="profile-info">
-          <small>Conta conectada</small>
-          <strong id="nomePerfil">Usuário</strong>
-          <span id="emailPerfil">Dados protegidos pela sua conta</span>
-        </div>
-      </section>
-
-      <section class="card settings-card" data-view="profile">
-        <button id="btnInstalarPerfil" class="setting-row" type="button">
-          <span><i data-lucide="smartphone"></i></span>
-          <div><strong>Instalar aplicativo</strong><small>Adicionar à tela inicial</small></div>
-          <i data-lucide="chevron-right"></i>
-        </button>
-        <button id="btnSair" class="setting-row danger-row" type="button">
-          <span><i data-lucide="log-out"></i></span>
-          <div><strong>Sair da conta</strong><small>Encerrar esta sessão</small></div>
-          <i data-lucide="chevron-right"></i>
-        </button>
-      </section>
-    </main>
-
-    <nav class="bottom-nav" aria-label="Navegação principal">
-      <button class="nav-item active" type="button" data-view-target="home" data-scroll-target="inicioSection">
-        <i data-lucide="house"></i><span>Início</span>
-      </button>
-      <button class="nav-item" type="button" data-view-target="expenses" data-scroll-target="gastoSection">
-        <i data-lucide="wallet-cards"></i><span>Gastos</span>
-      </button>
-      <button class="nav-item" type="button" data-view-target="reports" data-scroll-target="relatoriosSection">
-        <i data-lucide="chart-no-axes-column-increasing"></i><span>Relatórios</span>
-      </button>
-      <button class="nav-item" type="button" data-view-target="goal" data-scroll-target="orcamentoSection">
-        <i data-lucide="target"></i><span>Meta</span>
-      </button>
-      <button class="nav-item" type="button" data-view-target="profile" data-scroll-target="perfilSection">
-        <i data-lucide="user-round"></i><span>Perfil</span>
-      </button>
-    </nav>
+      <nav class="bottom-nav" id="bottomNav" aria-label="Navegação principal"></nav>
+    </div>
   </div>
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <button class="fab" id="transactionFab" aria-label="Nova transação" hidden>+</button>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script src="./script.js?v=9"></script>
-  <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js").catch((error) => {
-          console.warn("Service Worker não registrado:", error);
-        });
-      });
-    }
-  </script>
+  <div class="modal-backdrop" id="modalBackdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Lançamento</p>
+          <h3 id="modalTitle">Nova transação</h3>
+        </div>
+        <button class="icon-button" id="closeModal" aria-label="Fechar">×</button>
+      </div>
+      <form id="transactionForm" class="modal-form">
+        <div class="field">
+          <label for="txDescription">Descrição</label>
+          <input id="txDescription" required placeholder="Ex.: Mercado" />
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="txValue">Valor</label>
+            <input id="txValue" required inputmode="decimal" placeholder="0,00" />
+          </div>
+          <div class="field">
+            <label for="txType">Tipo</label>
+            <select id="txType">
+              <option value="expense">Saída</option>
+              <option value="income">Entrada</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="txCategory">Categoria</label>
+            <select id="txCategory"></select>
+          </div>
+          <div class="field">
+            <label for="txDate">Data</label>
+            <input id="txDate" type="date" required />
+          </div>
+        </div>
+        <div class="field">
+          <label for="txAccount">Conta / carteira</label>
+          <select id="txAccount"></select>
+        </div>
+        <div class="form-grid">
+          <label class="switch-row"><input id="txRecurring" type="checkbox" /><span>Recorrente</span></label>
+          <label class="switch-row"><input id="txInstallment" type="checkbox" /><span>Parcelado</span></label>
+        </div>
+        <div class="field">
+          <label for="txNotes">Observações</label>
+          <textarea id="txNotes" rows="3" placeholder="Opcional"></textarea>
+        </div>
+        <button class="primary-button" type="submit" id="transactionSubmit">Salvar transação</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="entityModalBackdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="entityModalTitle">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Cadastro</p>
+          <h3 id="entityModalTitle">Novo item</h3>
+        </div>
+        <button class="icon-button" id="closeEntityModal" aria-label="Fechar">×</button>
+      </div>
+      <form id="entityForm" class="modal-form">
+        <div id="entityFormFields"></div>
+        <button class="primary-button" type="submit" id="entitySubmit">Cadastrar</button>
+      </form>
+    </div>
+  </div>
+
+
+  <div class="modal-backdrop" id="notificationsBackdrop" hidden>
+    <div class="modal notifications-modal" role="dialog" aria-modal="true" aria-labelledby="notificationsTitle">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Central inteligente</p>
+          <h3 id="notificationsTitle">Notificações e alertas</h3>
+        </div>
+        <button class="icon-button" id="closeNotifications" aria-label="Fechar">×</button>
+      </div>
+      <div id="notificationsList" class="notifications-list"></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop onboarding-backdrop" id="onboardingBackdrop" hidden>
+    <div class="onboarding-modal" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+      <button class="onboarding-skip" id="onboardingSkip" type="button">Pular</button>
+      <div id="onboardingContent" class="onboarding-content"></div>
+      <div class="onboarding-footer">
+        <div class="onboarding-dots" id="onboardingDots" aria-hidden="true"></div>
+        <button class="primary-button" id="onboardingNext" type="button">Continuar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="passwordResetBackdrop" hidden>
+    <div class="modal auth-recovery-modal" role="dialog" aria-modal="true" aria-labelledby="passwordResetTitle">
+      <div class="modal-head"><div><p class="eyebrow">Segurança</p><h3 id="passwordResetTitle">Criar nova senha</h3></div><button class="icon-button" id="closePasswordReset" aria-label="Fechar">×</button></div>
+      <p class="section-subtitle recovery-copy">Digite uma nova senha para concluir a recuperação da sua conta.</p>
+      <form id="passwordResetForm" class="modal-form">
+        <div class="field"><label for="newPassword">Nova senha</label><input id="newPassword" type="password" minlength="8" required placeholder="Mínimo de 8 caracteres, com letras e números"></div>
+        <div class="field"><label for="confirmNewPassword">Confirmar nova senha</label><input id="confirmNewPassword" type="password" minlength="8" required placeholder="Digite novamente"></div>
+        <button class="primary-button" id="passwordResetSubmit" type="submit">Atualizar senha</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="financialSetupBackdrop" hidden>
+    <div class="modal financial-setup-modal" role="dialog" aria-modal="true" aria-labelledby="financialSetupTitle">
+      <div class="modal-head"><div><p class="eyebrow">Primeira configuração</p><h3 id="financialSetupTitle">Prepare seu planejamento</h3></div><button class="icon-button" id="skipFinancialSetup" aria-label="Fazer depois">×</button></div>
+      <p class="section-subtitle setup-copy">Esses dados ajudam o app a calcular metas, projeções e sua saúde financeira. Você poderá alterar tudo depois.</p>
+      <form id="financialSetupForm" class="modal-form setup-form">
+        <div class="field"><label for="setupName">Nome</label><input id="setupName" required placeholder="Seu nome"></div>
+        <div class="form-grid"><div class="field"><label for="setupIncome">Renda mensal aproximada</label><input id="setupIncome" inputmode="decimal" placeholder="0,00"></div><div class="field"><label for="setupPayday">Dia principal de recebimento</label><input id="setupPayday" type="number" min="1" max="31" placeholder="5"></div></div>
+        <div class="form-grid"><div class="field"><label for="setupSavingsTarget">Quanto deseja guardar por mês?</label><input id="setupSavingsTarget" inputmode="decimal" placeholder="800,00"></div><div class="field"><label for="setupBalance">Saldo atual da conta principal</label><input id="setupBalance" inputmode="decimal" placeholder="0,00"></div></div>
+        <div class="field"><label for="setupCurrency">Moeda</label><select id="setupCurrency"><option value="BRL">Real brasileiro (BRL)</option></select></div>
+        <button class="primary-button" id="financialSetupSubmit" type="submit">Salvar e começar</button>
+        <button class="secondary-button setup-later" id="financialSetupLater" type="button">Fazer depois</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="accountActionBackdrop" hidden>
+    <div class="modal account-action-modal" role="dialog" aria-modal="true" aria-labelledby="accountActionTitle">
+      <div class="modal-head"><div><p class="eyebrow">Conta e segurança</p><h3 id="accountActionTitle">Gerenciar conta</h3></div><button class="icon-button" id="closeAccountAction" aria-label="Fechar">×</button></div>
+      <p class="section-subtitle account-action-copy" id="accountActionCopy"></p>
+      <form id="accountActionForm" class="modal-form">
+        <div id="accountActionFields"></div>
+        <button class="primary-button" id="accountActionSubmit" type="submit">Continuar</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="infoBackdrop" hidden>
+    <div class="modal info-modal" role="dialog" aria-modal="true" aria-labelledby="infoModalTitle">
+      <div class="modal-head"><div><p class="eyebrow" id="infoModalEyebrow">Informações</p><h3 id="infoModalTitle">Esteja no Controle</h3></div><button class="icon-button" id="closeInfoModal" aria-label="Fechar">×</button></div>
+      <div id="infoModalContent" class="legal-content"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./js/config.js"></script>
+  <script src="./js/supabase-service.js"></script>
+  <script src="./js/app.js"></script>
 </body>
 </html>

@@ -1,37 +1,43 @@
 {
   "name": "Esteja no Controle",
   "short_name": "Controle",
-  "description": "App para organizar orçamento, gastos e metas financeiras.",
+  "description": "Planejamento financeiro pessoal com metas, automações, cartões e IA financeira.",
   "start_url": "./index.html",
-  "scope": "./",
   "display": "standalone",
-  "background_color": "#fff9fa",
-  "theme_color": "#ff5c7d",
-  "orientation": "portrait-primary",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
+  "lang": "pt-BR",
   "icons": [
     {
-      "src": "./images/icon-192.png",
+      "src": "./assets/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/png"
     },
     {
-      "src": "./images/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "./images/icon-512.png",
+      "src": "./assets/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
+      "type": "image/png"
+    }
+  ],
+  "id": "./",
+  "scope": "./",
+  "categories": [
+    "finance",
+    "productivity"
+  ],
+  "prefer_related_applications": false,
+  "shortcuts": [
     {
-      "src": "./images/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "name": "Abrir controle financeiro",
+      "short_name": "Início",
+      "url": "./index.html",
+      "icons": [
+        {
+          "src": "./assets/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ]
 }
