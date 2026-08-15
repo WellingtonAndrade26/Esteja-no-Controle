@@ -51,7 +51,7 @@
   let deferredInstallPrompt = null;
   let accountActionType = null;
   let lastOnlineState = navigator.onLine;
-  const APP_VERSION = window.ENC_CONFIG?.appVersion || "1.0.0";
+  const APP_VERSION = window.ENC_CONFIG?.appVersion || "1.0.1";
   const APP_BUILD = "2026-08-15";
   let swRegistration = null;
   let appReloading = false;
@@ -265,7 +265,7 @@
         {id:uid(),name:"Investimentos",value:12450,kind:"investimento"},
         {id:uid(),name:"Veículo",value:32000,kind:"veiculo"}
       ],
-      chat:[{role:"bot",text:"Olá! Sou sua IA Financeira local. Posso analisar gastos, contas, cartões, metas, saldo projetado e dívidas."}]
+      chat:[{role:"bot",text:"Olá! Sou sua IA Financeira local. Posso analisar gastos, contas, cartões, metas, saldo projetado, dívidas e dizer se uma compra cabe no seu mês."}]
     };
   }
 
@@ -435,6 +435,33 @@
     const pendingBills=(state.bills||[]).filter(b=>b.status!=="paid"&&String(b.dueDate||"").startsWith(currentMonth)&&Number(String(b.dueDate).slice(-2))>=today).reduce((s,b)=>s+Number(b.value||0),0);
     const subscriptionFuture=(state.subscriptions||[]).filter(s=>s.active&&Number(s.day)>=today).reduce((sum,s)=>sum+Number(s.value||0),0);
     return totalAccountBalance()+recurringFuture+plannedFuture-pendingBills-subscriptionFuture;
+  }
+
+  function optionalSpendingCapacity(){
+    const projected=projectedBalance();
+    const savingsTarget=Math.max(0,Number(state.settings?.monthlySavingsTarget||0));
+    return Math.max(0,projected-savingsTarget);
+  }
+
+  function extractPurchaseAmount(text){
+    const raw=String(text||"");
+    const matches=[...raw.matchAll(/(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})|\d+(?:[.,]\d{1,2})?)/gi)];
+    if(!matches.length)return null;
+    const values=matches.map(m=>{let s=m[1].trim();if(s.includes(","))s=s.replace(/\./g,"").replace(",",".");return Number(s);}).filter(v=>Number.isFinite(v)&&v>0);
+    return values.length?values[values.length-1]:null;
+  }
+
+  function purchaseDecision(amount){
+    const value=Math.max(0,Number(amount||0));
+    const projected=projectedBalance();
+    const savingsTarget=Math.max(0,Number(state.settings?.monthlySavingsTarget||0));
+    const after=projected-value;
+    const optional=Math.max(0,projected-savingsTarget);
+    const afterSavings=after-savingsTarget;
+    let status="fits";
+    if(after<0)status="does_not_fit";
+    else if(after<savingsTarget)status="hurts_savings_goal";
+    return {amount:value,projectedBefore:projected,projectedAfter:after,savingsTarget,availableForOptionalSpending:optional,remainingAboveSavingsTarget:afterSavings,status};
   }
   function biggestExpenseCategory() {
     const sums = {};
@@ -814,6 +841,14 @@
 
   function aiReply(question) {
     const q=question.toLowerCase(), [cat,value]=biggestExpenseCategory(), {income,expense}=totals();
+    if(/posso\s+(comprar|gastar)|dá\s+pra\s+(comprar|gastar)|da\s+pra\s+(comprar|gastar)|cabe\s+no\s+orçamento|cabe\s+no\s+orcamento/.test(q)){
+      const amount=extractPurchaseAmount(question);
+      if(!amount)return "Me diga o valor da compra para eu comparar com suas contas, saldo projetado e meta mensal de economia.";
+      const d=purchaseDecision(amount);
+      if(d.status==="does_not_fit")return `Pelos dados cadastrados, eu não recomendaria essa compra de ${money(amount)} neste mês. Seu saldo projetado antes da compra é ${money(d.projectedBefore)} e ficaria em ${money(d.projectedAfter)} depois dela.`;
+      if(d.status==="hurts_savings_goal")return `A compra de ${money(amount)} cabe no caixa, mas reduziria o valor reservado para sua meta mensal. Seu saldo projetado cairia de ${money(d.projectedBefore)} para ${money(d.projectedAfter)}, enquanto sua meta de guardar é ${money(d.savingsTarget)}. Para manter essa meta, seu limite de gasto opcional hoje é cerca de ${money(d.availableForOptionalSpending)}.`;
+      return `Pelos dados cadastrados, a compra de ${money(amount)} cabe neste mês sem comprometer as contas previstas nem sua meta mensal de ${money(d.savingsTarget)}. O saldo projetado passaria de ${money(d.projectedBefore)} para ${money(d.projectedAfter)}.`;
+    }
     if(/onde|mais|gastando|gasto/.test(q)) return value?`Seu maior gasto registrado neste mês está em ${cat}, com ${money(value)}.`:"Ainda não há gastos suficientes para comparar categorias.";
     if(/saldo|fim do mês|sobrar/.test(q)) return `Com os compromissos cadastrados, seu saldo projetado para o fim do mês é ${money(projectedBalance())}.`;
     if(/meta|guardar|economizar/.test(q)) { const g=state.goals?.[0]; if(!g)return "Cadastre uma meta em Planejamento para eu calcular quanto falta guardar."; const missing=Math.max(0,g.target-g.current); return `Para a meta “${g.name}”, faltam ${money(missing)}. Consulte a IA online para montar um plano considerando sua renda e o prazo real da meta.`; }
@@ -855,6 +890,11 @@
       currency:state.settings?.currency||"BRL",
       month:{income:Number(current.income.toFixed(2)),expense:Number(current.expense.toFixed(2)),result:Number((current.income-current.expense).toFixed(2)),previousIncome:Number(previous.income.toFixed(2)),previousExpense:Number(previous.expense.toFixed(2)),expenseChangePct:previous.expense?Math.round((current.expense-previous.expense)/previous.expense*100):null,topCategories},
       balances:{accountsTotal:Number(totalAccountBalance().toFixed(2)),projectedEndOfMonth:Number(projectedBalance().toFixed(2))},
+      purchaseDecision:{
+        savingsTarget:Number(Math.max(0,Number(state.settings?.monthlySavingsTarget||0)).toFixed(2)),
+        availableForOptionalSpending:Number(optionalSpendingCapacity().toFixed(2)),
+        rule:"availableForOptionalSpending = projectedEndOfMonth - monthlySavingsTarget; projectedEndOfMonth already considers future recurring items, planned transactions, pending bills and active subscriptions registered for the month"
+      },
       cards:(state.cards||[]).slice(0,6).map(c=>({name:c.name,invoice:Number(invoiceBalance(c.id,ym()).toFixed(2)),limit:Number(c.limit||0),available:Number(Math.max(0,Number(c.limit||0)-cardUsedAmount(c.id)).toFixed(2)),dueDay:c.dueDay||null})),
       subscriptions:{count:activeSubs.length,monthly:Number(activeSubs.reduce((s,x)=>s+Number(x.value||0),0).toFixed(2))},
       bills:{pendingCount:pendingBills.length,pendingTotal:Number(pendingBills.reduce((s,b)=>s+Number(b.value||0),0).toFixed(2)),next:pendingBills.slice(0,5).map(b=>({name:b.name,value:Number(b.value||0),dueDate:b.dueDate,status:b.status}))},
@@ -895,6 +935,7 @@
 
           <section class="card ai-suggestions-card"><div class="section-head"><div><h3 class="section-title">Sugestões rápidas</h3><span class="section-subtitle">Perguntas que a IA já consegue analisar</span></div></div><div class="suggestion-list">
             <button class="suggestion" data-ai-question="Como posso economizar este mês?"><span class="bot-avatar" style="color:var(--green)">♢</span><span><strong>Economizar este mês</strong><small>Analise os gastos variáveis.</small></span><span>›</span></button>
+            <button class="suggestion" data-ai-question="Posso fazer uma compra de R$ 250 este mês?"><span class="bot-avatar" style="color:var(--cyan)">◆</span><span><strong>Posso comprar?</strong><small>Compare uma compra com o que ainda sobra no mês.</small></span><span>›</span></button>
             <button class="suggestion" data-ai-question="Como está minha fatura?"><span class="bot-avatar" style="color:var(--purple)">▭</span><span><strong>Analisar minha fatura</strong><small>${money(invoice)} em aberto.</small></span><span>›</span></button>
             <button class="suggestion" data-ai-question="Como está minha meta?"><span class="bot-avatar">◎</span><span><strong>Plano para minha meta</strong><small>${goal?`Cerca de ${money(goalMonthly)}/mês.`:"Cadastre uma meta."}</small></span><span>›</span></button>
             <button class="suggestion" data-ai-question="Quanto gasto por ano com assinaturas?"><span class="bot-avatar" style="color:var(--cyan)">◉</span><span><strong>Minhas assinaturas</strong><small>${money((state.subscriptions||[]).filter(s=>s.active).reduce((sum,s)=>sum+Number(s.value||0),0))}/mês.</small></span><span>›</span></button>
@@ -905,7 +946,7 @@
         <section class="card ai-chat-panel">
           <div class="ai-chat-header"><div class="bot-avatar ai-chat-avatar">🤖</div><div><strong>Assistente financeiro</strong><small>${state.settings?.aiEnabled===false?"IA online desativada · cálculos locais ativos":"IA híbrida · cálculos precisos + interpretação inteligente"}</small></div><div class="ai-chat-status"><span class="ai-usage-chip">${runtimeMode==="cloud"?`${Number(state.settings?.aiUsage?.requests||0)}/${Number(state.settings?.aiUsage?.limit||30)} hoje`:"local"}</span><span class="ai-live-dot ${state.settings?.aiEnabled===false?"is-off":""}"></span></div></div>
           <div class="chat ai-chat-scroll" id="chatMessages">
-            <div class="bubble bot ai-welcome">Olá, ${escapeHtml((state.user?.name||"Usuário").split(/\s+/)[0])}! Posso analisar seu mês, gastos, metas, cartões, dívidas, assinaturas, contas a pagar e saldo projetado.</div>
+            <div class="bubble bot ai-welcome">Olá, ${escapeHtml((state.user?.name||"Usuário").split(/\s+/)[0])}! Posso analisar seu mês, gastos, metas, cartões, dívidas, contas a pagar e também avaliar se uma compra cabe no seu orçamento.</div>
             ${(state.chat||[]).slice(-10).map(m=>`<div class="bubble ${m.role}">${escapeHtml(m.text)}</div>`).join("")}
           </div>
           ${value?`<div class="ai-inline-insight"><div><small>Categoria que mais pesa no mês</small><strong>${escapeHtml(cat)}</strong></div><div><strong class="expense">${money(value)}</strong><span>${share}% das saídas</span></div></div>`:""}
