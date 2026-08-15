@@ -51,7 +51,7 @@
   let deferredInstallPrompt = null;
   let accountActionType = null;
   let lastOnlineState = navigator.onLine;
-  const APP_VERSION = window.ENC_CONFIG?.appVersion || "1.0.1";
+  const APP_VERSION = window.ENC_CONFIG?.appVersion || "1.0.2";
   const APP_BUILD = "2026-08-15";
   let swRegistration = null;
   let appReloading = false;
@@ -128,6 +128,31 @@
       return;
     }
     location.reload();
+  }
+
+  async function forceAppRefresh() {
+    const button = document.querySelector("[data-force-app-update]");
+    if (button) { button.disabled = true; button.textContent = "Atualizando..."; }
+    try {
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.filter(key => key.startsWith("esteja-no-controle-")).map(key => caches.delete(key)));
+      }
+      if (swRegistration) {
+        await swRegistration.update();
+        if (swRegistration.waiting) {
+          swRegistration.waiting.postMessage({ type: "SKIP_WAITING" });
+          return;
+        }
+      }
+      const url = new URL(location.href);
+      url.searchParams.set("atualizacao", Date.now().toString());
+      location.replace(url.toString());
+    } catch (err) {
+      console.error("Falha ao forçar atualização", err);
+      showToast("Não foi possível atualizar agora. Verifique sua conexão.", "error");
+      if (button) { button.disabled = false; button.textContent = "Atualizar agora"; }
+    }
   }
 
   async function checkForAppUpdate(showResult = false) {
@@ -568,9 +593,10 @@
 
 
   function setupNav() {
-    const markup = navItems.map(item => `<button class="nav-button ${item.id===currentPage?"is-active":""}" data-page-target="${item.id}"><span class="nav-icon">${item.icon}</span><span>${item.label}</span></button>`).join("");
-    $("#bottomNav").innerHTML = markup;
-    $("#desktopNav").innerHTML = markup;
+    const renderNav = items => items.map(item => `<button class="nav-button ${item.id===currentPage?"is-active":""}" data-page-target="${item.id}"><span class="nav-icon">${item.icon}</span><span>${item.label}</span></button>`).join("");
+    const mobileItems = [...navItems, {id:"settings", label:"Config.", icon:"⚙"}];
+    $("#bottomNav").innerHTML = renderNav(mobileItems);
+    $("#desktopNav").innerHTML = renderNav(navItems);
   }
 
   function showPage(page) {
@@ -1070,7 +1096,9 @@
           <div class="setting-row"><div><strong>Modo de dados</strong><span>${runtimeMode==="cloud"?"Supabase / nuvem":"Demonstração / localStorage"}</span></div><span class="status-pill ${runtimeMode}">${runtimeMode==="cloud"?"☁ Nuvem":"◈ Local"}</span></div>
           <div class="setting-row"><div><strong>Aparência</strong><span>Tema atual: ${state.settings?.theme==="dark"?"Escuro":"Claro"}</span></div><button class="secondary-button" data-toggle-theme>Alternar</button></div>
           <div class="setting-row"><div><strong>Instalar aplicativo</strong><span>${isStandalonePwa()?"O Esteja no Controle está aberto como PWA.":"Instale para abrir como um aplicativo no celular ou computador."}</span></div><button class="secondary-button" data-install-pwa ${(!deferredInstallPrompt||isStandalonePwa())?"disabled":""}>${installLabel}</button></div>
-          <div class="setting-row"><div><strong>Atualizações do aplicativo</strong><span>Verifique se existe uma versão nova publicada.</span></div><button class="secondary-button" data-check-update>Verificar</button></div>
+          <div class="setting-row"><div><strong>Versão instalada</strong><span>Esteja no Controle ${APP_VERSION}</span></div><span class="status-pill cloud">Atual</span></div>
+          <div class="setting-row"><div><strong>Verificar atualizações</strong><span>Consulta a versão publicada sem usar o cache do navegador.</span></div><button class="secondary-button" data-check-update>Verificar</button></div>
+          <div class="setting-row"><div><strong>Atualizar aplicativo agora</strong><span>Limpa somente o cache do Esteja no Controle, busca os arquivos novos e recarrega o app.</span></div><button class="primary-small" data-force-app-update>Atualizar agora</button></div>
           <div class="setting-row"><div><strong>Notificações do navegador</strong><span>Status: ${notificationStatus==="granted"?"Ativadas":notificationStatus==="denied"?"Bloqueadas":notificationStatus==="default"?"Ainda não autorizadas":"Indisponíveis"}</span></div><button class="secondary-button" data-enable-browser-notifications>${notificationStatus==="granted"?"Ativadas":"Ativar"}</button></div>
           <div class="setting-row"><div><strong>Tour inicial</strong><span>Reveja as principais áreas do aplicativo.</span></div><button class="secondary-button" data-open-onboarding>Ver tour</button></div>
           ${runtimeMode==="cloud"?`<div class="setting-row"><div><strong>Sincronização</strong><span>${lastCloudSyncAt?`Última: ${lastCloudSyncAt.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`:"Aguardando primeira sincronização."}</span></div><div class="setting-actions"><button class="secondary-button" data-run-automations>Automações</button><button class="secondary-button" data-sync-cloud>Sincronizar</button></div></div>`:""}
@@ -1637,6 +1665,7 @@
     if(e.target.closest("[data-toggle-ai]")){toggleAIOnline();return;}
     if(e.target.closest("[data-install-pwa]")){installPwa();return;}
     if(e.target.closest("[data-check-update]")){checkForAppUpdate(true);return;}
+    if(e.target.closest("[data-force-app-update]")){forceAppRefresh();return;}
     if(e.target.closest("[data-apply-app-update]")){activateWaitingServiceWorker();return;}
     const info=e.target.closest("[data-info-modal]");if(info){openInfoModal(info.dataset.infoModal);return;}
     if(e.target.closest("[data-copy-diagnostic]")){copyDiagnostic();return;}
