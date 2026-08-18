@@ -51,7 +51,7 @@
   let deferredInstallPrompt = null;
   let accountActionType = null;
   let lastOnlineState = navigator.onLine;
-  const APP_VERSION = window.ENC_CONFIG?.appVersion || "1.0.2";
+  const APP_VERSION = window.ENC_CONFIG?.appVersion || "1.0.3";
   const APP_BUILD = "2026-08-15";
   let swRegistration = null;
   let appReloading = false;
@@ -453,13 +453,40 @@
   function budgetSpent(budget) {
     return monthTransactions().filter(t=>t.type==="expense" && t.category===budget.category).reduce((s,t)=>s+Number(t.value||0),0);
   }
+
+  function activeInstallments(){
+    return (state.installments||[]).filter(i=>Number(i.paid||0)<Number(i.installments||0));
+  }
+  function monthlyInstallmentCommitment(){
+    return activeInstallments().reduce((sum,i)=>sum+Number(i.installmentValue||0),0);
+  }
+  function outstandingInstallmentBalance(){
+    return activeInstallments().reduce((sum,i)=>{
+      const remaining=Math.max(0,Number(i.installments||0)-Number(i.paid||0));
+      return sum+(remaining*Number(i.installmentValue||0));
+    },0);
+  }
+  function recordedInstallmentExpenseThisMonth(){
+    return monthTransactions().filter(t=>t.type==="expense"&&t.installment).reduce((sum,t)=>sum+Number(t.value||0),0);
+  }
+  function unrecordedInstallmentCommitment(){
+    return Math.max(0,monthlyInstallmentCommitment()-recordedInstallmentExpenseThisMonth());
+  }
+  function balanceAfterInstallments(){
+    return totalAccountBalance()-unrecordedInstallmentCommitment();
+  }
+  function dashboardExpenseTotal(){
+    return totals().expense+unrecordedInstallmentCommitment();
+  }
+
   function projectedBalance() {
     const today = now.getDate(), currentMonth=ym();
     const recurringFuture = (state.recurring || []).filter(r=>Number(r.day)>today).reduce((s,r)=>s+(r.type==="income"?Number(r.value||0):-Number(r.value||0)),0);
     const plannedFuture=(state.futureTransactions||[]).filter(f=>f.status!=="posted"&&String(f.date||"").startsWith(currentMonth)&&Number(String(f.date).slice(-2))>=today).reduce((s,f)=>s+(f.type==="income"?Number(f.value||0):-Number(f.value||0)),0);
     const pendingBills=(state.bills||[]).filter(b=>b.status!=="paid"&&String(b.dueDate||"").startsWith(currentMonth)&&Number(String(b.dueDate).slice(-2))>=today).reduce((s,b)=>s+Number(b.value||0),0);
     const subscriptionFuture=(state.subscriptions||[]).filter(s=>s.active&&Number(s.day)>=today).reduce((sum,s)=>sum+Number(s.value||0),0);
-    return totalAccountBalance()+recurringFuture+plannedFuture-pendingBills-subscriptionFuture;
+    const installmentCommitment=unrecordedInstallmentCommitment();
+    return totalAccountBalance()+recurringFuture+plannedFuture-pendingBills-subscriptionFuture-installmentCommitment;
   }
 
   function optionalSpendingCapacity(){
@@ -625,8 +652,39 @@
     renderSettings();
   }
 
+  async function addDashboardBalance(e){
+    e.preventDefault();
+    const form=e.currentTarget;
+    const source=form.querySelector("[name=balanceSource]")?.value||"Renda extra";
+    const value=parseMoneyInput(form.querySelector("[name=balanceValue]")?.value||"");
+    const accountId=form.querySelector("[name=balanceAccount]")?.value||primaryAccount()?.id||null;
+    if(!Number.isFinite(value)||value<=0){showToast("Digite um valor válido para adicionar ao saldo.","error");return;}
+    const category=source==="Vale / VR"?"VR":source;
+    const description=source==="Vale / VR"?"Vale / VR":source;
+    const data={description,value,type:"income",category,date:ymd(now.getDate()),accountId,recurring:false,installment:false,notes:"Adicionado pela tela inicial"};
+    const button=form.querySelector("button[type=submit]");
+    setBusy(button,true,"Adicionando...");
+    try{
+      if(runtimeMode==="cloud"){
+        await cloud.saveTransaction(state.user,data,null);
+        await refreshCloudState();
+      }else{
+        applyAccountDelta(accountId,value);
+        state.transactions.push({id:uid(),...data});
+        saveLocalState();renderAll();
+      }
+      showPage("dashboard");
+      showToast(`${money(value)} adicionados ao saldo como ${description}.`,"success");
+    }catch(err){console.error(err);showToast(err.message||"Não foi possível adicionar o saldo.","error");}
+    finally{setBusy(button,false);}
+  }
+
   function renderDashboard() {
     const {income,expense}=totals();
+    const installmentMonthly=monthlyInstallmentCommitment();
+    const installmentAdjustment=unrecordedInstallmentCommitment();
+    const effectiveExpense=dashboardExpenseTotal();
+    const availableBalance=balanceAfterInstallments();
     const score=healthScore();
     const pct=Math.round(score/10);
     const [bigCat,bigValue]=biggestExpenseCategory();
@@ -648,17 +706,27 @@
       </section>
 
       <div class="grid summary-grid">
-        <article class="card metric-card"><span class="metric-label">Saldo total</span><strong>${money(totalAccountBalance())}</strong><button class="micro-link" data-page-target="cards">▣ contas</button></article>
+        <article class="card metric-card"><span class="metric-label">Saldo disponível</span><strong class="${availableBalance<0?"expense":""}">${money(availableBalance)}</strong><div class="delta ${availableBalance<0?"expense":""}">Em contas: ${money(totalAccountBalance())} · parcelas: -${money(installmentAdjustment)}</div></article>
         <article class="card metric-card"><span class="metric-label">Entradas</span><strong class="income">${money(income)}</strong><div class="delta income">↗ neste mês</div></article>
-        <article class="card metric-card"><span class="metric-label">Saídas</span><strong class="expense">${money(expense)}</strong><div class="delta expense">↘ neste mês</div></article>
-        <article class="card metric-card"><span class="metric-label">Saldo projetado<br>no fim do mês</span><strong>${money(projectedBalance())}</strong></article>
+        <article class="card metric-card"><span class="metric-label">Saídas + parcelas</span><strong class="expense">${money(effectiveExpense)}</strong><div class="delta expense">${installmentMonthly?`${money(installmentMonthly)} em parcelas ativas`:`Sem parcelas ativas`}</div></article>
+        <article class="card metric-card"><span class="metric-label">Saldo projetado<br>no fim do mês</span><strong class="${projectedBalance()<0?"expense":""}">${money(projectedBalance())}</strong></article>
       </div>
 
       <section class="dashboard-premium-strip">
-        <article class="premium-mini-card"><span class="premium-mini-icon income">↗</span><div><small>Resultado do mês</small><strong class="${income-expense>=0?"income":"expense"}">${money(income-expense)}</strong><span>${income?Math.round((income-expense)/income*100):0}% da renda preservada</span></div></article>
+        <article class="premium-mini-card"><span class="premium-mini-icon income">↗</span><div><small>Resultado do mês</small><strong class="${income-effectiveExpense>=0?"income":"expense"}">${money(income-effectiveExpense)}</strong><span>${income?Math.round((income-effectiveExpense)/income*100):0}% da renda preservada após parcelas</span></div></article>
         <article class="premium-mini-card"><span class="premium-mini-icon warn">▭</span><div><small>Faturas abertas</small><strong>${money((state.cards||[]).reduce((sum,c)=>sum+invoiceBalance(c.id,ym()),0))}</strong><span>${state.cards?.length||0} cartão${(state.cards?.length||0)!==1?"ões":""} acompanhado${(state.cards?.length||0)!==1?"s":""}</span></div></article>
         <article class="premium-mini-card"><span class="premium-mini-icon accent">◎</span><div><small>Meta em destaque</small><strong>${escapeHtml(state.goals?.[0]?.name||"Crie uma meta")}</strong><span>${state.goals?.[0]?`${Math.min(100,Math.round(Number(state.goals[0].current||0)/Math.max(Number(state.goals[0].target||1),1)*100))}% concluída`:"Planeje seu próximo objetivo"}</span></div></article>
-        <article class="premium-mini-card"><span class="premium-mini-icon" style="color:var(--cyan)">◉</span><div><small>Assinaturas mensais</small><strong>${money((state.subscriptions||[]).filter(s=>s.active).reduce((sum,s)=>sum+Number(s.value||0),0))}</strong><span>${(state.subscriptions||[]).filter(s=>s.active).length} serviço${(state.subscriptions||[]).filter(s=>s.active).length!==1?"s":""} ativo${(state.subscriptions||[]).filter(s=>s.active).length!==1?"s":""}</span></div></article>
+        <article class="premium-mini-card"><span class="premium-mini-icon expense">▣</span><div><small>Parcelas mensais</small><strong class="expense">${money(installmentMonthly)}</strong><span>${activeInstallments().length} parcelamento${activeInstallments().length!==1?"s":""} ativo${activeInstallments().length!==1?"s":""} · ${money(outstandingInstallmentBalance())} restante</span></div></article>
+      </section>
+
+      <section class="card section-card dashboard-balance-card">
+        <div class="section-head"><div><h3 class="section-title">Adicionar saldo</h3><span class="section-subtitle">Salário, vale, renda extra ou outro recebimento</span></div><span class="badge">+ Entrada</span></div>
+        <form id="dashboardBalanceForm" class="dashboard-balance-form">
+          <label><span>Origem</span><select name="balanceSource"><option>Salário</option><option>Vale / VR</option><option>Adiantamento</option><option>Freelance</option><option>Renda extra</option><option>Reembolso</option><option>Outros</option></select></label>
+          <label><span>Valor</span><input name="balanceValue" inputmode="decimal" placeholder="0,00" required></label>
+          <label><span>Conta</span><select name="balanceAccount">${accountOptions(primaryAccount()?.id)}</select></label>
+          <button class="primary-button dashboard-balance-submit" type="submit">＋ Adicionar saldo</button>
+        </form>
       </section>
 
       <section class="card section-card">
@@ -681,6 +749,7 @@
         <div class="section-head"><div><h3 class="section-title">Alertas inteligentes</h3><span class="section-subtitle">Vencimentos e limites que pedem atenção</span></div><button class="link-button" data-open-notifications>Ver todos</button></div>
         <div class="notifications-list compact">${generatedNotifications().slice(0,3).map(notificationMarkup).join("")}</div>
       </section>`;
+    $("#dashboardBalanceForm")?.addEventListener("submit",addDashboardBalance);
   }
 
   function txIcon(tx) {
@@ -731,11 +800,20 @@
     const reserve=goals.find(g=>/reserva/i.test(g.name))||goals[0];
     const recurrings=(state.recurring||[]).sort((a,b)=>a.day-b.day).slice(0,6);
     const installments=state.installments||[];
+    const installmentMonthly=monthlyInstallmentCommitment();
+    const installmentOutstanding=outstandingInstallmentBalance();
+    const installmentContracted=installments.reduce((sum,i)=>sum+Number(i.total||(Number(i.installments||0)*Number(i.installmentValue||0))),0);
     const reservePct=reserve?Math.min(100,Math.round(Number(reserve.current||0)/Math.max(Number(reserve.target||1),1)*100)):0;
     $("#page-planning").innerHTML=`
       <div class="planning-layout">
         <section class="card planning-wide planning-priority">
           <div class="section-head"><div><h3 class="section-title">Parcelas</h3><span class="section-subtitle">Compras parceladas em andamento</span></div><button class="primary-small" data-create-entity="installment">+ Parcela</button></div>
+          <div class="installment-summary-grid">
+            <div><small>Parcelas por mês</small><strong class="expense">${money(installmentMonthly)}</strong></div>
+            <div><small>Total restante</small><strong>${money(installmentOutstanding)}</strong></div>
+            <div><small>Total contratado</small><strong>${money(installmentContracted)}</strong></div>
+            <div><small>Parcelamentos ativos</small><strong>${activeInstallments().length}</strong></div>
+          </div>
           ${installments.length?installments.map(it=>{const p=Math.min(100,Math.round(Number(it.paid||0)/Math.max(Number(it.installments||1),1)*100));const remaining=Math.max(0,Number(it.installments||0)-Number(it.paid||0));const paidValue=Number(it.paid||0)*Number(it.installmentValue||0);return `<article class="installment-feature-card"><div class="installment-art" aria-hidden="true">${installmentVisual(it.name)}</div><div class="feature-copy"><div class="installment-top"><div><strong>${escapeHtml(it.name)} - ${it.installments}x de ${money(it.installmentValue)}</strong><small>${it.paid}/${it.installments} pagas${it.cardId?` · ${escapeHtml(cardName(it.cardId))}`:""}</small></div><span class="installment-rest">Restam ${remaining}</span></div><div class="progress blue"><span style="width:${p}%"></span></div><div class="installment-meta"><div><small>Valor da parcela</small><strong>${money(it.installmentValue)}</strong></div><div><small>Próxima parcela</small><strong>${it.nextDue?shortDate(it.nextDue):"Sem data"}</strong></div><div><small>Total do parcelamento</small><strong>${money(it.total || (Number(it.installments||0)*Number(it.installmentValue||0)))}</strong></div><div><small>Parcelas pagas</small><strong>${money(paidValue)}</strong></div></div>${actionButtonsCompact("installment",it.id,"installment-actions")}</div></article>`;}).join(""):`<div class="empty-state">Nenhuma compra parcelada cadastrada.</div>`}
         </section>
 
@@ -876,7 +954,7 @@
       return `Pelos dados cadastrados, a compra de ${money(amount)} cabe neste mês sem comprometer as contas previstas nem sua meta mensal de ${money(d.savingsTarget)}. O saldo projetado passaria de ${money(d.projectedBefore)} para ${money(d.projectedAfter)}.`;
     }
     if(/onde|mais|gastando|gasto/.test(q)) return value?`Seu maior gasto registrado neste mês está em ${cat}, com ${money(value)}.`:"Ainda não há gastos suficientes para comparar categorias.";
-    if(/saldo|fim do mês|sobrar/.test(q)) return `Com os compromissos cadastrados, seu saldo projetado para o fim do mês é ${money(projectedBalance())}.`;
+    if(/saldo|fim do mês|sobrar/.test(q)) return `Com os compromissos cadastrados, incluindo ${money(monthlyInstallmentCommitment())} em parcelas mensais ativas, seu saldo projetado para o fim do mês é ${money(projectedBalance())}.`;
     if(/meta|guardar|economizar/.test(q)) { const g=state.goals?.[0]; if(!g)return "Cadastre uma meta em Planejamento para eu calcular quanto falta guardar."; const missing=Math.max(0,g.target-g.current); return `Para a meta “${g.name}”, faltam ${money(missing)}. Consulte a IA online para montar um plano considerando sua renda e o prazo real da meta.`; }
     if(/cartão|fatura/.test(q)) { const c=cardById(selectedCardId)||state.cards?.[0]; return c?`A fatura atual do ${c.name} está em ${money(cardInvoiceTotal(c.id))} e o limite disponível estimado é ${money(Math.max(0,Number(c.limit||0)-cardUsedAmount(c.id)))}.`:"Você ainda não cadastrou um cartão."; }
     if(/dívida/.test(q)) { const total=(state.debts||[]).reduce((s,d)=>s+Number(d.balance||0),0); return total?`Você possui ${money(total)} em dívidas cadastradas. O comprometimento mensal informado é ${money((state.debts||[]).reduce((s,d)=>s+Number(d.installment||0),0))}.`:"Nenhuma dívida está cadastrada."; }
@@ -885,7 +963,7 @@
     if(/conta a pagar|boleto|vencimento/.test(q)){const pending=(state.bills||[]).filter(b=>b.status!=="paid").sort((a,b)=>String(a.dueDate).localeCompare(String(b.dueDate)));return pending.length?`Você tem ${pending.length} contas pendentes, totalizando ${money(pending.reduce((s,b)=>s+Number(b.value||0),0))}. A próxima é ${pending[0].name}, em ${shortDate(pending[0].dueDate)}.`:"Não há contas pendentes cadastradas.";}
     if(/saúde|pontuação|score/.test(q)){const h=healthBreakdown();return `Sua Saúde Financeira está em ${healthScore()}/1000. Pontos: gastos ${h.spending}/200, reserva ${h.reserve}/200, dívidas ${h.debt}/200, organização ${h.organization}/200 e metas ${h.goals}/200.`;}
     if(/ano|anual|12 meses/.test(q)){const annual=annualSeries(),inc=annual.reduce((s,x)=>s+x.income,0),exp=annual.reduce((s,x)=>s+x.expense,0);return `No ano de ${now.getFullYear()}, há ${money(inc)} em entradas registradas e ${money(exp)} em saídas, com resultado de ${money(inc-exp)}.`;}
-    if(/renda|entrada/.test(q)) return `As entradas deste mês somam ${money(income)} e as saídas somam ${money(expense)}.`;
+    if(/renda|entrada/.test(q)) return `As entradas deste mês somam ${money(income)}. As saídas registradas são ${money(expense)} e, considerando parcelas ativas ainda não registradas como pagamento, o compromisso total fica em ${money(dashboardExpenseTotal())}.`;
     return "A IA online pode comparar meses, explicar variações, analisar metas, faturas, dívidas e projetar cenários. No modo local eu continuo respondendo com os cálculos já disponíveis no aplicativo.";
   }
 
@@ -914,12 +992,13 @@
     return {
       period:ym(),
       currency:state.settings?.currency||"BRL",
-      month:{income:Number(current.income.toFixed(2)),expense:Number(current.expense.toFixed(2)),result:Number((current.income-current.expense).toFixed(2)),previousIncome:Number(previous.income.toFixed(2)),previousExpense:Number(previous.expense.toFixed(2)),expenseChangePct:previous.expense?Math.round((current.expense-previous.expense)/previous.expense*100):null,topCategories},
-      balances:{accountsTotal:Number(totalAccountBalance().toFixed(2)),projectedEndOfMonth:Number(projectedBalance().toFixed(2))},
+      month:{income:Number(current.income.toFixed(2)),expense:Number(current.expense.toFixed(2)),expenseWithInstallments:Number(dashboardExpenseTotal().toFixed(2)),result:Number((current.income-dashboardExpenseTotal()).toFixed(2)),previousIncome:Number(previous.income.toFixed(2)),previousExpense:Number(previous.expense.toFixed(2)),expenseChangePct:previous.expense?Math.round((current.expense-previous.expense)/previous.expense*100):null,topCategories},
+      balances:{accountsTotal:Number(totalAccountBalance().toFixed(2)),afterInstallments:Number(balanceAfterInstallments().toFixed(2)),projectedEndOfMonth:Number(projectedBalance().toFixed(2))},
+      installments:{activeCount:activeInstallments().length,monthlyCommitment:Number(monthlyInstallmentCommitment().toFixed(2)),unrecordedMonthlyCommitment:Number(unrecordedInstallmentCommitment().toFixed(2)),outstandingBalance:Number(outstandingInstallmentBalance().toFixed(2))},
       purchaseDecision:{
         savingsTarget:Number(Math.max(0,Number(state.settings?.monthlySavingsTarget||0)).toFixed(2)),
         availableForOptionalSpending:Number(optionalSpendingCapacity().toFixed(2)),
-        rule:"availableForOptionalSpending = projectedEndOfMonth - monthlySavingsTarget; projectedEndOfMonth already considers future recurring items, planned transactions, pending bills and active subscriptions registered for the month"
+        rule:"availableForOptionalSpending = projectedEndOfMonth - monthlySavingsTarget; projectedEndOfMonth already considers future recurring items, planned transactions, pending bills, active subscriptions and active installment commitments not already recorded as paid expenses"
       },
       cards:(state.cards||[]).slice(0,6).map(c=>({name:c.name,invoice:Number(invoiceBalance(c.id,ym()).toFixed(2)),limit:Number(c.limit||0),available:Number(Math.max(0,Number(c.limit||0)-cardUsedAmount(c.id)).toFixed(2)),dueDay:c.dueDay||null})),
       subscriptions:{count:activeSubs.length,monthly:Number(activeSubs.reduce((s,x)=>s+Number(x.value||0),0).toFixed(2))},
