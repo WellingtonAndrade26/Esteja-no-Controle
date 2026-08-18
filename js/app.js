@@ -11,6 +11,8 @@
   const $$ = sel => [...document.querySelectorAll(sel)];
   const clone = obj => JSON.parse(JSON.stringify(obj));
   const uid = () => (window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  const icon = name => window.ENCIcons?.get?.(name) || "";
+  const financeCore = window.ENCFinanceCore || {};
 
   const categoryNames = {
     income: ["Salário", "VR", "Adiantamento", "Freelance", "Renda extra", "Outros"],
@@ -18,11 +20,11 @@
   };
 
   const navItems = [
-    {id:"dashboard", label:"Início", icon:"⌂"},
-    {id:"transactions", label:"Transações", icon:"☷"},
-    {id:"planning", label:"Planejamento", icon:"▣"},
-    {id:"cards", label:"Cartões", icon:"▭"},
-    {id:"ai", label:"IA", icon:"✦"}
+    {id:"dashboard", label:"Início", icon:"home"},
+    {id:"transactions", label:"Transações", icon:"transactions"},
+    {id:"planning", label:"Planejamento", icon:"planning"},
+    {id:"cards", label:"Cartões", icon:"cards"},
+    {id:"ai", label:"IA", icon:"ai"}
   ];
 
   const pageNames = {
@@ -41,6 +43,14 @@
   let runtimeMode = "local";
   let currentPage = "dashboard";
   let transactionFilter = "all";
+  let transactionSearch = "";
+  let transactionLimit = 24;
+  let planningBillsLimit = 12;
+  let planningFutureLimit = 12;
+  let planningCommitmentSearch = "";
+  let planningCommitmentFilter = "all";
+  let cardPurchaseSearch = "";
+  let cardPurchaseFilter = "all";
   let editingTransactionId = null;
   let selectedCardId = null;
   let selectedInvoiceMonth = null;
@@ -51,8 +61,8 @@
   let deferredInstallPrompt = null;
   let accountActionType = null;
   let lastOnlineState = navigator.onLine;
-  const APP_VERSION = window.ENC_CONFIG?.appVersion || "1.0.3";
-  const APP_BUILD = "2026-08-15";
+  const APP_VERSION = window.ENC_CONFIG?.appVersion || "1.0.5";
+  const APP_BUILD = "2026-08-17";
   let swRegistration = null;
   let appReloading = false;
 
@@ -455,13 +465,13 @@
   }
 
   function activeInstallments(){
-    return (state.installments||[]).filter(i=>Number(i.paid||0)<Number(i.installments||0));
+    return financeCore.activeInstallments ? financeCore.activeInstallments(state.installments||[]) : (state.installments||[]).filter(i=>Number(i.paid||0)<Number(i.installments||0));
   }
   function monthlyInstallmentCommitment(){
-    return activeInstallments().reduce((sum,i)=>sum+Number(i.installmentValue||0),0);
+    return financeCore.monthlyInstallmentCommitment ? financeCore.monthlyInstallmentCommitment(state.installments||[]) : activeInstallments().reduce((sum,i)=>sum+Number(i.installmentValue||0),0);
   }
   function outstandingInstallmentBalance(){
-    return activeInstallments().reduce((sum,i)=>{
+    return financeCore.outstandingInstallmentBalance ? financeCore.outstandingInstallmentBalance(state.installments||[]) : activeInstallments().reduce((sum,i)=>{
       const remaining=Math.max(0,Number(i.installments||0)-Number(i.paid||0));
       return sum+(remaining*Number(i.installmentValue||0));
     },0);
@@ -504,16 +514,8 @@
   }
 
   function purchaseDecision(amount){
-    const value=Math.max(0,Number(amount||0));
-    const projected=projectedBalance();
-    const savingsTarget=Math.max(0,Number(state.settings?.monthlySavingsTarget||0));
-    const after=projected-value;
-    const optional=Math.max(0,projected-savingsTarget);
-    const afterSavings=after-savingsTarget;
-    let status="fits";
-    if(after<0)status="does_not_fit";
-    else if(after<savingsTarget)status="hurts_savings_goal";
-    return {amount:value,projectedBefore:projected,projectedAfter:after,savingsTarget,availableForOptionalSpending:optional,remainingAboveSavingsTarget:afterSavings,status};
+    const args={amount,projectedBalance:projectedBalance(),savingsTarget:Math.max(0,Number(state.settings?.monthlySavingsTarget||0))};
+    return financeCore.purchaseDecision ? financeCore.purchaseDecision(args) : {amount:Number(amount||0),projectedBefore:args.projectedBalance,projectedAfter:args.projectedBalance-Number(amount||0),savingsTarget:args.savingsTarget,availableForOptionalSpending:Math.max(0,args.projectedBalance-args.savingsTarget),remainingAboveSavingsTarget:args.projectedBalance-Number(amount||0)-args.savingsTarget,status:(args.projectedBalance-Number(amount||0)<0?"does_not_fit":args.projectedBalance-Number(amount||0)<args.savingsTarget?"hurts_savings_goal":"fits")};
   }
   function biggestExpenseCategory() {
     const sums = {};
@@ -620,8 +622,8 @@
 
 
   function setupNav() {
-    const renderNav = items => items.map(item => `<button class="nav-button ${item.id===currentPage?"is-active":""}" data-page-target="${item.id}"><span class="nav-icon">${item.icon}</span><span>${item.label}</span></button>`).join("");
-    const mobileItems = [...navItems, {id:"settings", label:"Config.", icon:"⚙"}];
+    const renderNav = items => items.map(item => `<button class="nav-button ${item.id===currentPage?"is-active":""}" data-page-target="${item.id}" aria-label="${item.label}"><span class="nav-icon">${icon(item.icon)}</span><span>${item.label}</span></button>`).join("");
+    const mobileItems = [...navItems, {id:"settings", label:"Config.", icon:"settings"}];
     $("#bottomNav").innerHTML = renderNav(mobileItems);
     $("#desktopNav").innerHTML = renderNav(navItems);
   }
@@ -632,10 +634,10 @@
     $$('[data-page-target]').forEach(b=>b.classList.toggle("is-active",b.dataset.pageTarget===page));
     const displayName=(state.user?.name||"Usuário").split(/\s+/)[0];
     const titles={dashboard:`Olá, ${displayName} 👋`,transactions:"Transações",planning:"Meu mês",cards:"Cartões",ai:"IA Financeira",reports:"Relatórios",settings:"Configurações"};
-    const actions={dashboard:["🔔","notices","Notificações"],transactions:["⌕","search","Pesquisar"],planning:["⚙","settings","Configurações"],cards:["＋","add-card","Novo cartão"],ai:["◇","privacy","Privacidade da IA"],reports:["↥","export","Exportar"],settings:["☾","theme","Alternar tema"]};
+    const actions={dashboard:["bell","notices","Notificações"],transactions:["search","search","Pesquisar"],planning:["settings","settings","Configurações"],cards:["plus","add-card","Novo cartão"],ai:["shield","privacy","Privacidade da IA"],reports:["download","export","Exportar"],settings:[state.settings.theme==="dark"?"sun":"moon","theme","Alternar tema"]};
     $("#pageTitle").textContent=titles[page]||pageNames[page]||"Esteja no Controle";
-    const action=$("#pageAction"), cfg=actions[page]||["•","none",""];
-    action.textContent=cfg[0]; action.dataset.action=cfg[1]; action.setAttribute("aria-label",cfg[2]);
+    const action=$("#pageAction"), cfg=actions[page]||["settings","none",""];
+    action.innerHTML=icon(cfg[0]); action.dataset.action=cfg[1]; action.setAttribute("aria-label",cfg[2]);
     $("#transactionFab").hidden=page!=="transactions";
     if(page==="reports") renderReports();
     if(page==="settings") renderSettings();
@@ -758,18 +760,49 @@
   }
 
   function renderTransactions() {
-    let txs=[...monthTransactions()].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    let txs=[...monthTransactions()].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
     if(transactionFilter==="income") txs=txs.filter(t=>t.type==="income");
     if(transactionFilter==="expense") txs=txs.filter(t=>t.type==="expense");
     if(transactionFilter==="recurring") txs=txs.filter(t=>t.recurring);
     if(transactionFilter==="installment") txs=txs.filter(t=>t.installment);
+    const query=transactionSearch.trim().toLocaleLowerCase("pt-BR");
+    if(query) txs=txs.filter(t=>[t.description,t.category,accountName(t.accountId),t.notes].some(v=>String(v||"").toLocaleLowerCase("pt-BR").includes(query)));
+    const filteredTotal=txs.length;
+    const visible=txs.slice(0,transactionLimit);
     const {income,expense}=totals();
+    const categoryMap={};
+    monthTransactions().filter(t=>t.type==="expense").forEach(t=>categoryMap[t.category]=(categoryMap[t.category]||0)+Number(t.value||0));
+    const topCats=Object.entries(categoryMap).sort((a,b)=>b[1]-a[1]).slice(0,4);
+    const topMax=Math.max(1,...topCats.map(([,v])=>v));
+    const largest=[...monthTransactions()].sort((a,b)=>Number(b.value||0)-Number(a.value||0))[0];
+    const dailyAvg=expense/Math.max(1,now.getDate());
     $("#page-transactions").innerHTML=`
-      <div class="filter-scroll">${[["all","Todos"],["income","Entradas"],["expense","Saídas"],["recurring","Recorrentes"]].map(([id,label])=>`<button class="filter-chip ${transactionFilter===id?"is-active":""}" data-filter="${id}">${label}</button>`).join("")}</div>
-      <p class="section-subtitle" style="margin:2px 3px 9px;text-transform:capitalize">${monthLabel()}</p>
-      <div class="transactions-list">${txs.length?txs.map(tx=>`<article class="transaction-row"><div class="tx-icon">${txIcon(tx)}</div><div class="tx-main"><strong>${escapeHtml(tx.description)}</strong><small>${shortDate(tx.date)} · ${escapeHtml(accountName(tx.accountId))}${tx.recurring?` · Recorrente`:""}${tx.installment?` · Parcelado`:""}</small></div><div class="tx-side"><div class="tx-value ${tx.type==="income"?"income":"expense"}">${tx.type==="income"?"+":"-"}${money(tx.value)}</div><div class="row-actions"><button title="Editar" data-edit-transaction="${tx.id}">✎</button><button title="Excluir" data-delete-transaction="${tx.id}">×</button></div></div></article>`).join(""):`<div class="card empty-state">Nenhuma transação neste filtro.</div>`}</div>
-      <div class="month-summary" style="margin-top:8px"><div class="card"><small>Entradas</small><strong class="income">${money(income)}</strong></div><div class="card"><small>Saídas</small><strong class="expense">${money(expense)}</strong></div></div>`;
+      <div class="transaction-toolbar">
+        <div class="filter-scroll">${[["all","Todos"],["income","Entradas"],["expense","Saídas"],["recurring","Recorrentes"]].map(([id,label])=>`<button class="filter-chip ${transactionFilter===id?"is-active":""}" data-filter="${id}">${label}</button>`).join("")}</div>
+        <div class="transaction-tool-actions"><label class="transaction-search"><span>${icon("search")}</span><input id="transactionSearch" data-transaction-search value="${escapeHtml(transactionSearch)}" placeholder="Buscar por nome, categoria ou conta" aria-label="Pesquisar transações"></label><button class="secondary-button" data-export-transactions>CSV</button></div>
+      </div>
+      <p class="section-subtitle transaction-month-label">${monthLabel()} · ${filteredTotal} resultado${filteredTotal!==1?"s":""}</p>
+      <div class="transactions-desktop-layout">
+        <div class="transactions-main-column">
+          <div class="transactions-list">${visible.length?visible.map(tx=>`<article class="transaction-row"><div class="tx-icon">${txIcon(tx)}</div><div class="tx-main"><strong>${escapeHtml(tx.description)}</strong><small>${shortDate(tx.date)} · ${escapeHtml(accountName(tx.accountId))}${tx.recurring?` · Recorrente`:""}${tx.installment?` · Parcelado`:""}</small></div><div class="tx-side"><div class="tx-value ${tx.type==="income"?"income":"expense"}">${tx.type==="income"?"+":"-"}${money(tx.value)}</div><div class="row-actions"><button title="Editar" data-edit-transaction="${tx.id}">✎</button><button title="Excluir" data-delete-transaction="${tx.id}">×</button></div></div></article>`).join(""):`<div class="card empty-state">Nenhuma transação encontrada.</div>`}</div>
+          ${filteredTotal>visible.length?`<button class="load-more-button" data-load-more-transactions>Carregar mais · ${filteredTotal-visible.length} restantes</button>`:""}
+          <div class="month-summary"><div class="card"><small>Entradas</small><strong class="income">${money(income)}</strong></div><div class="card"><small>Saídas</small><strong class="expense">${money(expense)}</strong></div></div>
+        </div>
+        <aside class="transactions-insights card">
+          <div class="section-head"><div><p class="eyebrow">Resumo do mês</p><h3 class="section-title">Leitura rápida</h3></div></div>
+          <div class="transaction-insight-metrics"><div><small>Média de saída/dia</small><strong>${money(dailyAvg)}</strong></div><div><small>Maior lançamento</small><strong>${largest?money(largest.value):money(0)}</strong><span>${largest?escapeHtml(largest.description):"Sem dados"}</span></div></div>
+          <div class="transaction-category-mini"><small>Principais categorias de saída</small>${topCats.length?topCats.map(([cat,val])=>`<div class="transaction-category-row" title="${escapeHtml(cat)}: ${money(val)}"><div><span>${escapeHtml(cat)}</span><strong>${money(val)}</strong></div><div class="transaction-category-track"><i style="width:${Math.max(4,val/topMax*100)}%"></i></div></div>`).join(""):`<div class="empty-state compact">Cadastre despesas para ver a distribuição.</div>`}</div>
+          <button class="secondary-button transaction-report-link" data-page-target="reports">Abrir relatórios completos</button>
+        </aside>
+      </div>`;
+    const searchInput=$("#transactionSearch");
+    searchInput?.addEventListener("input",e=>{
+      const caret=e.target.selectionStart||e.target.value.length;
+      transactionSearch=e.target.value;transactionLimit=24;renderTransactions();
+      requestAnimationFrame(()=>{const next=$("#transactionSearch");if(next){next.focus();next.setSelectionRange(Math.min(caret,next.value.length),Math.min(caret,next.value.length));}});
+    });
   }
+
 
   function buildCalendar() {
     const first=new Date(now.getFullYear(),now.getMonth(),1);
@@ -804,6 +837,11 @@
     const installmentOutstanding=outstandingInstallmentBalance();
     const installmentContracted=installments.reduce((sum,i)=>sum+Number(i.total||(Number(i.installments||0)*Number(i.installmentValue||0))),0);
     const reservePct=reserve?Math.min(100,Math.round(Number(reserve.current||0)/Math.max(Number(reserve.target||1),1)*100)):0;
+    const planningQuery=planningCommitmentSearch.trim().toLocaleLowerCase("pt-BR");
+    const planningMatch=(...values)=>!planningQuery||values.some(v=>String(v||"").toLocaleLowerCase("pt-BR").includes(planningQuery));
+    const planningBills=(state.bills||[]).slice().sort((a,b)=>String(a.dueDate).localeCompare(String(b.dueDate))).filter(b=>planningMatch(b.name,b.category,b.status,accountName(b.accountId)));
+    const planningSubscriptions=(state.subscriptions||[]).filter(sub=>planningMatch(sub.name,sub.category,sub.active?"ativa":"pausada",accountName(sub.accountId)));
+    const planningResults=planningCommitmentFilter==="bills"?planningBills.length:planningCommitmentFilter==="subscriptions"?planningSubscriptions.length:planningBills.length+planningSubscriptions.length;
     $("#page-planning").innerHTML=`
       <div class="planning-layout">
         <section class="card planning-wide planning-priority">
@@ -836,15 +874,20 @@
 
         <section class="card planning-wide v12-financial-commitments">
           <div class="section-head"><div><h3 class="section-title">Contas e assinaturas</h3><span class="section-subtitle">Boletos, serviços mensais e compromissos fixos</span></div><div class="toolbar-actions"><button class="secondary-button" data-create-entity="subscription">+ Assinatura</button><button class="primary-small" data-create-entity="bill">+ Conta</button></div></div>
-          <div class="commitments-grid">
-            <div class="commitment-column"><div class="commitment-title"><span>▤ Contas a pagar</span><strong>${money((state.bills||[]).filter(b=>b.status!=="paid").reduce((s,b)=>s+Number(b.value||0),0))}</strong></div>${(state.bills||[]).length?(state.bills||[]).slice().sort((a,b)=>String(a.dueDate).localeCompare(String(b.dueDate))).map(b=>`<article class="commitment-row ${b.status==="paid"?"is-paid":""}"><span class="commitment-icon">${b.status==="paid"?"✓":"▤"}</span><div><strong>${escapeHtml(b.name)}</strong><small>${b.status==="paid"?"Pago":`Vence ${shortDate(b.dueDate)}`} · ${escapeHtml(b.category||"Outros")}</small></div><strong class="${b.status==="paid"?"income":"expense"}">${money(b.value)}</strong><div class="commitment-actions">${b.status!=="paid"?`<button data-pay-bill="${b.id}" title="Pagar">✓</button>`:""}<button data-edit-entity="bill" data-id="${b.id}" title="Editar">✎</button><button data-delete-entity="bill" data-id="${b.id}" title="Excluir">×</button></div></article>`).join(""):`<div class="empty-state">Nenhuma conta cadastrada.</div>`}</div>
-            <div class="commitment-column"><div class="commitment-title"><span>◉ Assinaturas</span><strong>${money((state.subscriptions||[]).filter(s=>s.active).reduce((sum,s)=>sum+Number(s.value||0),0))}/mês</strong></div>${(state.subscriptions||[]).length?(state.subscriptions||[]).map(s=>`<article class="subscription-card ${s.active?"":"is-paused"}"><span class="subscription-icon">${escapeHtml(s.icon||"◉")}</span><div><strong>${escapeHtml(s.name)}</strong><small>Renova dia ${String(s.day||1).padStart(2,"0")} · ${s.active?"Ativa":"Pausada"}</small></div><strong>${money(s.value)}</strong>${actionButtons("subscription",s.id)}</article>`).join(""):`<div class="empty-state">Nenhuma assinatura cadastrada.</div>`}</div>
+          <div class="planning-search-tools">
+            <label class="transaction-search planning-search"><span>${icon("search")}</span><input id="planningCommitmentSearch" value="${escapeHtml(planningCommitmentSearch)}" placeholder="Buscar conta ou assinatura" aria-label="Pesquisar contas e assinaturas"></label>
+            <div class="filter-scroll planning-filter-scroll">${[["all","Todos"],["bills","Contas"],["subscriptions","Assinaturas"]].map(([id,label])=>`<button class="filter-chip ${planningCommitmentFilter===id?"is-active":""}" data-planning-filter="${id}">${label}</button>`).join("")}</div>
+          </div>
+          <p class="section-subtitle planning-search-result">${planningResults} resultado${planningResults!==1?"s":""}${planningQuery?` para “${escapeHtml(planningCommitmentSearch)}”`:""}</p>
+          <div class="commitments-grid ${planningCommitmentFilter!=="all"?"is-single-column":""}">
+            ${planningCommitmentFilter!=="subscriptions"?`<div class="commitment-column"><div class="commitment-title"><span>▤ Contas a pagar</span><strong>${money(planningBills.filter(b=>b.status!=="paid").reduce((sum,b)=>sum+Number(b.value||0),0))}</strong></div>${planningBills.length?planningBills.slice(0,planningBillsLimit).map(b=>`<article class="commitment-row ${b.status==="paid"?"is-paid":""}"><span class="commitment-icon">${b.status==="paid"?"✓":"▤"}</span><div><strong>${escapeHtml(b.name)}</strong><small>${b.status==="paid"?"Pago":`Vence ${shortDate(b.dueDate)}`} · ${escapeHtml(b.category||"Outros")}</small></div><strong class="${b.status==="paid"?"income":"expense"}">${money(b.value)}</strong><div class="commitment-actions">${b.status!=="paid"?`<button data-pay-bill="${b.id}" title="Pagar">✓</button>`:""}<button data-edit-entity="bill" data-id="${b.id}" title="Editar">✎</button><button data-delete-entity="bill" data-id="${b.id}" title="Excluir">×</button></div></article>`).join("")+(planningBills.length>planningBillsLimit?`<button class="load-more-button compact-load" data-load-more-bills>Carregar mais contas</button>`:""):`<div class="empty-state">Nenhuma conta encontrada.</div>`}</div>`:""}
+            ${planningCommitmentFilter!=="bills"?`<div class="commitment-column"><div class="commitment-title"><span>◉ Assinaturas</span><strong>${money(planningSubscriptions.filter(sub=>sub.active).reduce((sum,sub)=>sum+Number(sub.value||0),0))}/mês</strong></div>${planningSubscriptions.length?planningSubscriptions.map(sub=>`<article class="subscription-card ${sub.active?"":"is-paused"}"><span class="subscription-icon">${escapeHtml(sub.icon||"◉")}</span><div><strong>${escapeHtml(sub.name)}</strong><small>Renova dia ${String(sub.day||1).padStart(2,"0")} · ${sub.active?"Ativa":"Pausada"}</small></div><strong>${money(sub.value)}</strong>${actionButtons("subscription",sub.id)}</article>`).join(""):`<div class="empty-state">Nenhuma assinatura encontrada.</div>`}</div>`:""}
           </div>
         </section>
 
         <section class="card planning-wide future-launches-card">
           <div class="section-head"><div><h3 class="section-title">Lançamentos futuros</h3><span class="section-subtitle">Entradas e saídas previstas para os próximos dias</span></div><button class="primary-small" data-create-entity="futureTransaction">+ Previsão</button></div>
-          <div class="future-launch-grid">${(state.futureTransactions||[]).length?(state.futureTransactions||[]).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(f=>`<article class="future-launch"><span class="future-date">${shortDate(f.date)}</span><span class="future-dot ${f.type}"></span><div><strong>${escapeHtml(f.description)}</strong><small>${escapeHtml(f.category||"Outros")} · ${f.status==="posted"?"Lançado":"Previsto"}</small></div><strong class="${f.type==="income"?"income":"expense"}">${f.type==="income"?"+":"-"}${money(f.value)}</strong><div class="future-actions">${f.status!=="posted"?`<button data-post-future="${f.id}" title="Lançar agora">↗</button>`:""}<button data-edit-entity="futureTransaction" data-id="${f.id}" title="Editar">✎</button><button data-delete-entity="futureTransaction" data-id="${f.id}" title="Excluir">×</button></div></article>`).join(""):`<div class="empty-state">Nenhum lançamento futuro cadastrado.</div>`}</div>
+          <div class="future-launch-grid">${(state.futureTransactions||[]).length?(state.futureTransactions||[]).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).slice(0,planningFutureLimit).map(f=>`<article class="future-launch"><span class="future-date">${shortDate(f.date)}</span><span class="future-dot ${f.type}"></span><div><strong>${escapeHtml(f.description)}</strong><small>${escapeHtml(f.category||"Outros")} · ${f.status==="posted"?"Lançado":"Previsto"}</small></div><strong class="${f.type==="income"?"income":"expense"}">${f.type==="income"?"+":"-"}${money(f.value)}</strong><div class="future-actions">${f.status!=="posted"?`<button data-post-future="${f.id}" title="Lançar agora">↗</button>`:""}<button data-edit-entity="futureTransaction" data-id="${f.id}" title="Editar">✎</button><button data-delete-entity="futureTransaction" data-id="${f.id}" title="Excluir">×</button></div></article>`).join("")+((state.futureTransactions||[]).length>planningFutureLimit?`<button class="load-more-button compact-load" data-load-more-future>Carregar mais lançamentos</button>`:""):`<div class="empty-state">Nenhum lançamento futuro cadastrado.</div>`}</div>
         </section>
 
         <section class="card planning-wide contribution-history-card">
@@ -862,6 +905,12 @@
           <div class="calendar">${buildCalendar()}</div>
         </section>
       </div>`;
+    const planningSearchInput=$("#planningCommitmentSearch");
+    planningSearchInput?.addEventListener("input",e=>{
+      const caret=e.target.selectionStart||e.target.value.length;
+      planningCommitmentSearch=e.target.value;planningBillsLimit=12;renderPlanning();
+      requestAnimationFrame(()=>{const next=$("#planningCommitmentSearch");if(next){next.focus();next.setSelectionRange(Math.min(caret,next.value.length),Math.min(caret,next.value.length));}});
+    });
   }
 
 
@@ -886,6 +935,13 @@
     const invoiceMonths=card?invoiceMonthsForCard(card.id):[];
     if(!selectedInvoiceMonth || !invoiceMonths.includes(selectedInvoiceMonth)) selectedInvoiceMonth=invoiceMonths.includes(ym())?ym():(invoiceMonths.at(-1)||ym());
     const purchases=card?cardPurchases(card.id,selectedInvoiceMonth):[];
+    const cardQuery=cardPurchaseSearch.trim().toLocaleLowerCase("pt-BR");
+    const filteredPurchases=purchases.filter(p=>{
+      if(cardPurchaseFilter==="installments" && Number(p.installments||1)<=1)return false;
+      if(cardPurchaseFilter==="single" && Number(p.installments||1)>1)return false;
+      if(!cardQuery)return true;
+      return [p.description,p.category,shortDate(p.date)].some(v=>String(v||"").toLocaleLowerCase("pt-BR").includes(cardQuery));
+    });
     const invoice=card?cardInvoiceTotal(card.id,selectedInvoiceMonth):0;
     const invoicePaid=card?invoicePaidTotal(card.id,selectedInvoiceMonth):0;
     const invoiceRemaining=card?invoiceBalance(card.id,selectedInvoiceMonth):0;
@@ -924,7 +980,8 @@
           <div class="section-head"><div><p class="eyebrow">Faturas mensais</p><h3 class="section-title">${card?escapeHtml(card.name):"Cartão"}</h3><span class="section-subtitle">Fechamento automático no dia ${card?.closingDay||"—"} · vencimento ${card?.dueDay||"—"}</span></div>${card?`<button class="primary-small" data-create-card-purchase="${card.id}">+ Compra</button>`:""}</div>
           ${card?`<div class="invoice-month-tabs">${invoiceMonths.map(m=>{const st=invoiceStatus(card.id,m), bal=invoiceBalance(card.id,m);return `<button class="invoice-month-tab ${m===selectedInvoiceMonth?"is-active":""}" data-select-invoice="${m}"><span>${monthKeyLabel(m)}</span><small>${invoiceStatusLabel(st)} · ${money(bal)}</small></button>`;}).join("")}</div>`:""}
           ${card?`<div class="invoice-summary-panel"><div><span class="invoice-status invoice-status--${invoiceState}">${invoiceStatusLabel(invoiceState)}</span><h4>${monthKeyLabel(selectedInvoiceMonth)}</h4><small>Vencimento ${shortDate(invoiceDueDate(card.id,selectedInvoiceMonth))}</small></div><div class="invoice-balance"><small>Saldo da fatura</small><strong>${money(invoiceRemaining)}</strong><span>${invoicePaid?`${money(invoicePaid)} já pago de ${money(invoice)}`:`Total ${money(invoice)}`}</span></div></div>`:""}
-          ${purchases.length?purchases.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(p=>`<div class="invoice-purchase"><div class="purchase-icon">${txIcon({category:p.category,type:"expense"})}</div><div class="purchase-copy"><strong>${escapeHtml(p.description)}</strong><small>${shortDate(p.date)} · ${escapeHtml(p.category||"Outros")}${Number(p.installments||1)>1?` · ${p.currentInstallment||1}/${p.installments}`:""}</small></div><strong>${money(p.amount)}</strong>${actionButtons("cardPurchase",p.id)}</div>`).join(""):`<div class="empty-state">Nenhuma compra cadastrada nesta fatura.</div>`}
+          ${card?`<div class="invoice-search-tools"><label class="transaction-search invoice-search"><span>${icon("search")}</span><input id="cardPurchaseSearch" value="${escapeHtml(cardPurchaseSearch)}" placeholder="Buscar compra ou categoria" aria-label="Pesquisar compras da fatura"></label><div class="filter-scroll">${[["all","Todas"],["single","À vista"],["installments","Parceladas"]].map(([id,label])=>`<button class="filter-chip ${cardPurchaseFilter===id?"is-active":""}" data-card-purchase-filter="${id}">${label}</button>`).join("")}</div><span class="invoice-search-count">${filteredPurchases.length} de ${purchases.length}</span></div>`:""}
+          ${filteredPurchases.length?filteredPurchases.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(p=>`<div class="invoice-purchase"><div class="purchase-icon">${txIcon({category:p.category,type:"expense"})}</div><div class="purchase-copy"><strong>${escapeHtml(p.description)}</strong><small>${shortDate(p.date)} · ${escapeHtml(p.category||"Outros")}${Number(p.installments||1)>1?` · ${p.currentInstallment||1}/${p.installments}`:""}</small></div><strong>${money(p.amount)}</strong>${actionButtons("cardPurchase",p.id)}</div>`).join(""):`<div class="empty-state">${purchases.length?"Nenhuma compra corresponde à busca/filtro.":"Nenhuma compra cadastrada nesta fatura."}</div>`}
           ${card?`<div class="invoice-total-row"><span>Total da fatura</span><strong>${money(invoice)}</strong></div><div class="invoice-payment-actions">${invoiceRemaining>0&&invoiceState!=="future"?`<button class="primary-button" data-pay-invoice data-card-id="${card.id}" data-invoice-month="${selectedInvoiceMonth}">Pagar fatura · ${money(invoiceRemaining)}</button>`:`<span class="invoice-paid-message">${invoiceState==="paid"?"✓ Fatura paga":"Pagamento disponível após o fechamento"}</span>`}</div>`:""}
           ${payments.length?`<div class="invoice-payment-history"><div class="section-head"><h4>Pagamentos</h4><span>${payments.length} registro${payments.length>1?"s":""}</span></div>${payments.map(p=>`<div class="payment-row"><div><strong>${money(p.amount)}</strong><small>${shortDate(p.paidOn)} · ${escapeHtml(accountName(p.accountId))}</small></div><span class="income">✓ Pago</span></div>`).join("")}</div>`:""}
         </section>
@@ -941,6 +998,12 @@
 
         <section class="card section-card card-highlight"><div class="section-head"><div><p class="eyebrow">Patrimônio</p><h3 class="section-title">Patrimônio líquido</h3></div><strong class="${net>=0?"income":"expense"}">${money(net)}</strong></div><svg class="sparkline" viewBox="0 0 300 62" preserveAspectRatio="none"><polyline points="0,50 35,46 68,47 103,38 138,40 172,28 205,31 238,20 270,22 300,10"></polyline></svg><div class="cc-stats"><div class="cc-stat"><small>Ativos + contas</small><strong>${money(liquidAssets)}</strong></div><div class="cc-stat"><small>Dívidas</small><strong class="expense">${money(debts)}</strong></div></div><div class="section-head" style="margin-top:10px"><span class="section-subtitle">Gerenciar ativos</span><button class="link-button" data-create-entity="asset">+ Ativo</button></div>${(state.assets||[]).slice(0,3).map(a=>`<div class="entity-row"><div class="entity-main"><strong>${escapeHtml(a.name)}</strong><small>${escapeHtml(a.kind||"outro")}</small></div><strong style="font-size:.65rem">${money(a.value)}</strong>${actionButtons("asset",a.id)}</div>`).join("")}</section>
       </div>`;
+    const cardSearchInput=$("#cardPurchaseSearch");
+    cardSearchInput?.addEventListener("input",e=>{
+      const caret=e.target.selectionStart||e.target.value.length;
+      cardPurchaseSearch=e.target.value;renderCards();
+      requestAnimationFrame(()=>{const next=$("#cardPurchaseSearch");if(next){next.focus();next.setSelectionRange(Math.min(caret,next.value.length),Math.min(caret,next.value.length));}});
+    });
   }
 
   function aiReply(question) {
@@ -1022,6 +1085,10 @@
     const invoice=aiCard?invoiceBalance(aiCard.id,ym()):0;
     const projected=projectedBalance();
     const score=healthScore();
+    const optional=optionalSpendingCapacity();
+    const pendingBillsTotal=(state.bills||[]).filter(b=>b.status!=="paid").reduce((sum,b)=>sum+Number(b.value||0),0);
+    const activeSubscriptionsTotal=(state.subscriptions||[]).filter(sub=>sub.active).reduce((sum,sub)=>sum+Number(sub.value||0),0);
+    const chatCount=(state.chat||[]).length;
     $("#page-ai").innerHTML=`
       <div class="ai-layout">
         <aside class="ai-side-panel">
@@ -1053,6 +1120,20 @@
           <div class="chat ai-chat-scroll" id="chatMessages">
             <div class="bubble bot ai-welcome">Olá, ${escapeHtml((state.user?.name||"Usuário").split(/\s+/)[0])}! Posso analisar seu mês, gastos, metas, cartões, dívidas, contas a pagar e também avaliar se uma compra cabe no seu orçamento.</div>
             ${(state.chat||[]).slice(-10).map(m=>`<div class="bubble ${m.role}">${escapeHtml(m.text)}</div>`).join("")}
+            ${chatCount<=2?`<section class="ai-chat-context-board">
+              <div class="ai-context-head"><div><small>Visão rápida</small><strong>Antes de perguntar, veja como está seu mês</strong></div><span>${chatCount?"Continue a conversa":"Escolha uma análise"}</span></div>
+              <div class="ai-context-metrics">
+                <article><small>Gasto opcional estimado</small><strong class="${optional>=0?"income":"expense"}">${money(optional)}</strong><span>após compromissos e meta</span></article>
+                <article><small>Contas + assinaturas</small><strong>${money(pendingBillsTotal+activeSubscriptionsTotal)}</strong><span>compromissos cadastrados</span></article>
+                <article><small>Parcelas mensais</small><strong>${money(monthlyInstallmentCommitment())}</strong><span>ativas neste mês</span></article>
+              </div>
+              <div class="ai-context-prompts">
+                <button data-ai-question="Posso fazer uma compra de R$ 250 este mês?"><span>◆</span><div><strong>Posso comprar?</strong><small>Simule uma compra sem comprometer o mês.</small></div></button>
+                <button data-ai-question="O que mais está pesando no meu orçamento este mês?"><span>↘</span><div><strong>O que está pesando?</strong><small>Encontre gastos e compromissos mais fortes.</small></div></button>
+                <button data-ai-question="Quanto posso guardar este mês sem faltar dinheiro?"><span>◎</span><div><strong>Quanto posso guardar?</strong><small>Compare saldo projetado, contas e meta.</small></div></button>
+                <button data-ai-question="Quais contas e parcelas ainda faltam pagar este mês?"><span>▤</span><div><strong>O que falta pagar?</strong><small>Veja compromissos antes do fim do mês.</small></div></button>
+              </div>
+            </section>`:""}
           </div>
           ${value?`<div class="ai-inline-insight"><div><small>Categoria que mais pesa no mês</small><strong>${escapeHtml(cat)}</strong></div><div><strong class="expense">${money(value)}</strong><span>${share}% das saídas</span></div></div>`:""}
           <form class="chat-form ai-chat-form" id="aiForm"><input id="aiInput" placeholder="Pergunte algo sobre suas finanças..." autocomplete="off" maxlength="1400"><button class="send-button" type="submit">➤</button></form>
@@ -1113,18 +1194,30 @@
       <div class="reports-grid">
         <section class="card report-chart-card"><div class="section-head"><div><h3 class="section-title">Fluxo de caixa · 6 meses</h3><span class="section-subtitle">Entradas x saídas registradas</span></div><div class="chart-legend"><span><i class="income-dot"></i>Entradas</span><span><i class="expense-dot"></i>Saídas</span></div></div><div class="bar-chart">${series.map(x=>`<div class="bar-month"><div class="bar-pair"><span class="bar income-bar" style="height:${Math.max(3,x.income/maxFlow*100)}%" title="${money(x.income)}"></span><span class="bar expense-bar" style="height:${Math.max(3,x.expense/maxFlow*100)}%" title="${money(x.expense)}"></span></div><small>${escapeHtml(x.label)}</small></div>`).join("")}</div></section>
 
-        <section class="card report-chart-card"><div class="section-head"><div><h3 class="section-title">Evolução das faturas</h3><span class="section-subtitle">Total lançado em todos os cartões</span></div></div><div class="invoice-chart">${series.map(x=>`<div class="invoice-chart-row"><span>${escapeHtml(x.label)}</span><div class="invoice-chart-track"><i style="width:${Math.max(2,x.invoices/maxInv*100)}%"></i></div><strong>${money(x.invoices)}</strong></div>`).join("")}</div></section>
+        <section class="card report-chart-card"><div class="section-head"><div><h3 class="section-title">Evolução das faturas</h3><span class="section-subtitle">Total lançado em todos os cartões</span></div></div><div class="invoice-chart">${series.map(x=>`<div class="invoice-chart-row"><span>${escapeHtml(x.label)}</span><div class="invoice-chart-track" title="${escapeHtml(x.label)}: ${money(x.invoices)}"><i style="width:${Math.max(2,x.invoices/maxInv*100)}%"></i></div><strong>${money(x.invoices)}</strong></div>`).join("")}</div></section>
 
-        <section class="card report-chart-card"><div class="section-head"><div><h3 class="section-title">Gastos por categoria</h3><span class="section-subtitle">Onde o dinheiro saiu neste mês</span></div></div><div class="category-report">${categories.length?categories.map(([cat,val])=>`<div class="category-report-row"><div><span>${escapeHtml(cat)}</span><strong>${money(val)}</strong></div><div class="category-report-track"><i style="width:${Math.max(3,val/categoryMax*100)}%"></i></div></div>`).join(""):`<div class="empty-state">Sem despesas para analisar.</div>`}</div></section>
+        <section class="card report-chart-card"><div class="section-head"><div><h3 class="section-title">Gastos por categoria</h3><span class="section-subtitle">Onde o dinheiro saiu neste mês</span></div></div><div class="category-report">${categories.length?categories.map(([cat,val])=>`<div class="category-report-row"><div><span>${escapeHtml(cat)}</span><strong>${money(val)}</strong></div><div class="category-report-track" title="${escapeHtml(cat)}: ${money(val)}"><i style="width:${Math.max(3,val/categoryMax*100)}%"></i></div></div>`).join(""):`<div class="empty-state">Sem despesas para analisar.</div>`}</div></section>
 
         <section class="card report-chart-card"><div class="section-head"><div><h3 class="section-title">Patrimônio</h3><span class="section-subtitle">Visão consolidada</span></div><strong class="${assets-debts>=0?"income":"expense"}">${money(assets-debts)}</strong></div><div class="report-patrimony"><div><small>Contas + ativos</small><strong>${money(assets)}</strong></div><div><small>Dívidas</small><strong class="expense">${money(debts)}</strong></div><div><small>Saúde financeira</small><strong>${healthScore()}/1000</strong></div></div></section>
       </div>
 
-      <section class="card section-card annual-report-card"><div class="section-head"><div><p class="eyebrow">Visão anual</p><h3 class="section-title">${now.getFullYear()} em 12 meses</h3><span class="section-subtitle">Acompanhe a evolução do ano inteiro.</span></div><strong class="${annualSeries().reduce((s,x)=>s+x.income-x.expense,0)>=0?"income":"expense"}">${money(annualSeries().reduce((s,x)=>s+x.income-x.expense,0))}</strong></div><div class="annual-bars">${(()=>{const a=annualSeries(),max=Math.max(1,...a.flatMap(x=>[x.income,x.expense]));return a.map(x=>`<div class="annual-month"><div class="annual-pair"><i class="annual-income" style="height:${Math.max(2,x.income/max*100)}%"></i><i class="annual-expense" style="height:${Math.max(2,x.expense/max*100)}%"></i></div><small>${escapeHtml(x.label)}</small></div>`).join("")})()}</div></section>
+      <section class="card section-card annual-report-card"><div class="section-head"><div><p class="eyebrow">Visão anual</p><h3 class="section-title">${now.getFullYear()} em 12 meses</h3><span class="section-subtitle">Acompanhe a evolução do ano inteiro.</span></div><strong class="${annualSeries().reduce((s,x)=>s+x.income-x.expense,0)>=0?"income":"expense"}">${money(annualSeries().reduce((s,x)=>s+x.income-x.expense,0))}</strong></div><div class="annual-bars">${(()=>{const a=annualSeries(),max=Math.max(1,...a.flatMap(x=>[x.income,x.expense]));return a.map(x=>`<div class="annual-month"><div class="annual-pair" title="${escapeHtml(x.label)} · Entradas ${money(x.income)} · Saídas ${money(x.expense)}"><i class="annual-income" style="height:${Math.max(2,x.income/max*100)}%"></i><i class="annual-expense" style="height:${Math.max(2,x.expense/max*100)}%"></i></div><small>${escapeHtml(x.label)}</small></div>`).join("")})()}</div></section>
 
       <section class="card section-card health-breakdown-card"><div class="section-head"><div><p class="eyebrow">Saúde Financeira</p><h3 class="section-title">Como sua nota é formada</h3><span class="section-subtitle">Cada dimensão vale até 200 pontos.</span></div><strong class="income">${healthScore()}/1000</strong></div><div class="health-dimensions">${(()=>{const h=healthBreakdown(),rows=[["Gastos x renda",h.spending],["Reserva",h.reserve],["Dívidas",h.debt],["Organização",h.organization],["Metas",h.goals]];return rows.map(([label,val])=>`<div class="health-dimension"><div><span>${label}</span><strong>${val}/200</strong></div><div class="progress ${val<100?"red":val<150?"yellow":""}"><span style="width:${Math.round(val/2)}%"></span></div></div>`).join("")})()}</div></section>
 
       <section class="card section-card"><div class="section-head"><div><h3 class="section-title">Contas e cartões</h3><span class="section-subtitle">Visão consolidada da sua estrutura financeira</span></div></div>${accountsList().map(a=>`<div class="simple-row"><div><strong>${escapeHtml(a.name)}</strong><small>${escapeHtml(a.institution||a.type||"Conta")}</small></div><strong>${money(a.balance)}</strong></div>`).join("")}${(state.cards||[]).map(c=>`<div class="simple-row"><div><strong>Fatura ${escapeHtml(c.name)}</strong><small>•••• ${escapeHtml(c.last4||"0000")} · ${invoiceStatusLabel(invoiceStatus(c.id,ym()))}</small></div><strong class="expense">${money(invoiceBalance(c.id,ym()))}</strong></div>`).join("")}</section>`;
+  }
+
+  function exportTransactionsCsv(){
+    let txs=[...monthTransactions()].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    if(transactionFilter==="income")txs=txs.filter(t=>t.type==="income");
+    if(transactionFilter==="expense")txs=txs.filter(t=>t.type==="expense");
+    if(transactionFilter==="recurring")txs=txs.filter(t=>t.recurring);
+    const q=transactionSearch.trim().toLocaleLowerCase("pt-BR");
+    if(q)txs=txs.filter(t=>[t.description,t.category,accountName(t.accountId),t.notes].some(v=>String(v||"").toLocaleLowerCase("pt-BR").includes(q)));
+    const rows=[["Data","Descrição","Tipo","Categoria","Conta","Valor","Recorrente","Parcelado"],...txs.map(x=>[x.date,x.description,x.type==="income"?"Entrada":"Saída",x.category||"",accountName(x.accountId),Number(x.value||0).toFixed(2),x.recurring?"Sim":"Não",x.installment?"Sim":"Não"])];
+    const csv=rows.map(row=>row.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(";")).join("\n");
+    const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`esteja-no-controle-transacoes-${ym()}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);showToast("Transações exportadas em CSV.","success");
   }
 
   function exportReportCsv(){
@@ -1671,7 +1764,7 @@
   }
 
   function switchAuthMode(mode) {
-    $$(".auth-tab").forEach(b=>b.classList.toggle("is-active",b.dataset.authMode===mode));
+    $$(".auth-tab").forEach(b=>{const active=b.dataset.authMode===mode;b.classList.toggle("is-active",active);b.setAttribute("aria-selected",String(active));b.tabIndex=active?0:-1;});
     $("#nameField").hidden=mode!=="signup";$("#authName").required=mode==="signup";$("#confirmPasswordField").hidden=mode!=="signup";$("#authConfirmPassword").required=mode==="signup";$("#authPassword").minLength=mode==="signup"?8:6;$("#authSubmit").textContent=mode==="signup"?"Criar conta":"Entrar";
     if(mode!=="signup"){$("#authConfirmPassword").value="";$("#passwordMatchHint").textContent="";}
     if($("#forgotPassword")?.closest(".auth-help-row")) $("#forgotPassword").closest(".auth-help-row").hidden=mode==="signup";
@@ -1709,13 +1802,15 @@
       else if(action==="theme"){setTheme(state.settings.theme==="dark"?"light":"dark");renderSettings();}
       else if(action==="export") exportData();
       else if(action==="notices") openNotifications();
-      else if(action==="search") showToast("Use os filtros para localizar suas transações.");
+      else if(action==="search"){showPage("transactions");setTimeout(()=>$("#transactionSearch")?.focus(),30);}
       else if(action==="privacy") openInfoModal("privacy");
       return;
     }
     const page=e.target.closest("[data-page-target]");if(page){showPage(page.dataset.pageTarget);return;}
-    const cardSelect=e.target.closest("[data-select-card]");if(cardSelect){selectedCardId=cardSelect.dataset.selectCard;selectedInvoiceMonth=ym();renderCards();return;}
-    const invoiceSelect=e.target.closest("[data-select-invoice]");if(invoiceSelect){selectedInvoiceMonth=invoiceSelect.dataset.selectInvoice;renderCards();if(invoiceSelect.hasAttribute("data-scroll-invoice"))setTimeout(()=>document.querySelector("#invoiceDetail")?.scrollIntoView({behavior:"smooth",block:"start"}),20);return;}
+    const planningFilterButton=e.target.closest("[data-planning-filter]");if(planningFilterButton){planningCommitmentFilter=planningFilterButton.dataset.planningFilter||"all";planningBillsLimit=12;renderPlanning();return;}
+    const cardPurchaseFilterButton=e.target.closest("[data-card-purchase-filter]");if(cardPurchaseFilterButton){cardPurchaseFilter=cardPurchaseFilterButton.dataset.cardPurchaseFilter||"all";renderCards();return;}
+    const cardSelect=e.target.closest("[data-select-card]");if(cardSelect){selectedCardId=cardSelect.dataset.selectCard;selectedInvoiceMonth=ym();cardPurchaseSearch="";cardPurchaseFilter="all";renderCards();return;}
+    const invoiceSelect=e.target.closest("[data-select-invoice]");if(invoiceSelect){selectedInvoiceMonth=invoiceSelect.dataset.selectInvoice;cardPurchaseSearch="";cardPurchaseFilter="all";renderCards();if(invoiceSelect.hasAttribute("data-scroll-invoice"))setTimeout(()=>document.querySelector("#invoiceDetail")?.scrollIntoView({behavior:"smooth",block:"start"}),20);return;}
     const addPurchase=e.target.closest("[data-create-card-purchase]");if(addPurchase){selectedCardId=addPurchase.dataset.createCardPurchase;openEntityModal("cardPurchase");const sel=$("#entityFormFields select[name=cardId]");if(sel)sel.value=selectedCardId;return;}
     const payInvoice=e.target.closest("[data-pay-invoice]");if(payInvoice){invoicePaymentContext={cardId:payInvoice.dataset.cardId,invoiceMonth:payInvoice.dataset.invoiceMonth};openEntityModal("invoicePayment");return;}
     const contribute=e.target.closest("[data-goal-contribution]");if(contribute){openEntityModal("goalContribution");const sel=$("#entityFormFields select[name=goalId]");if(sel)sel.value=contribute.dataset.goalContribution;return;}
@@ -1728,7 +1823,11 @@
     const deleteE=e.target.closest("[data-delete-entity]");if(deleteE){deleteEntity(deleteE.dataset.deleteEntity,deleteE.dataset.id);return;}
     const editTx=e.target.closest("[data-edit-transaction]");if(editTx){openTransactionModal(editTx.dataset.editTransaction);return;}
     const deleteTx=e.target.closest("[data-delete-transaction]");if(deleteTx){deleteTransaction(deleteTx.dataset.deleteTransaction);return;}
-    const filter=e.target.closest("[data-filter]");if(filter){transactionFilter=filter.dataset.filter;renderTransactions();return;}
+    const filter=e.target.closest("[data-filter]");if(filter){transactionFilter=filter.dataset.filter;transactionLimit=24;renderTransactions();return;}
+    if(e.target.closest("[data-load-more-transactions]")){transactionLimit+=24;renderTransactions();return;}
+    if(e.target.closest("[data-load-more-bills]")){planningBillsLimit+=12;renderPlanning();return;}
+    if(e.target.closest("[data-load-more-future]")){planningFutureLimit+=12;renderPlanning();return;}
+    if(e.target.closest("[data-export-transactions]")){exportTransactionsCsv();return;}
     const ai=e.target.closest("[data-ai-question]");if(ai){sendAIQuestion(ai.dataset.aiQuestion);return;}
     if(e.target.closest("[data-open-settings]")){showPage("settings");return;}
     if(e.target.closest("[data-toggle-theme]")){setTheme(state.settings.theme==="dark"?"light":"dark");renderSettings();return;}
@@ -1768,7 +1867,10 @@
     $("#skipFinancialSetup")?.addEventListener("click",()=>{closeFinancialSetup();setTimeout(()=>openOnboarding(false),120);});
     $("#financialSetupLater")?.addEventListener("click",()=>{closeFinancialSetup();setTimeout(()=>openOnboarding(false),120);});
     $("#financialSetupBackdrop")?.addEventListener("click",e=>{if(e.target===$("#financialSetupBackdrop"))closeFinancialSetup();});
-    $$(".auth-tab").forEach(b=>b.addEventListener("click",()=>switchAuthMode(b.dataset.authMode)));
+    $$(".auth-tab").forEach(b=>{
+      b.addEventListener("click",()=>switchAuthMode(b.dataset.authMode));
+      b.addEventListener("keydown",e=>{if(!["ArrowLeft","ArrowRight"].includes(e.key))return;e.preventDefault();const next=b.dataset.authMode==="login"?"signup":"login";switchAuthMode(next);document.querySelector(`.auth-tab[data-auth-mode="${next}"]`)?.focus();});
+    });
     $("#demoLogin").addEventListener("click",demoLogin);
     $("#authModeSwitch")?.addEventListener("click",()=>switchAuthMode($(".auth-tab.is-active").dataset.authMode==="login"?"signup":"login"));
     $("#togglePassword").addEventListener("click",()=>{const input=$("#authPassword");input.type=input.type==="password"?"text":"password";});

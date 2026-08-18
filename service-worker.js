@@ -1,4 +1,4 @@
-const CACHE = "esteja-no-controle-1-0-4";
+const CACHE = "esteja-no-controle-1-0-6";
 const CORE = [
   "./",
   "./index.html",
@@ -11,10 +11,14 @@ const CORE = [
   "./js/config.js",
   "./js/supabase-service.js",
   "./js/app.js",
+  "./js/finance-core.js",
+  "./js/icons.js",
   "./manifest.json",
   "./assets/icon-192.png",
   "./assets/icon-512.png",
-  "./assets/fridge.svg"
+  "./assets/fridge.svg",
+  "./favicon.ico",
+  "./assets/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", event => {
