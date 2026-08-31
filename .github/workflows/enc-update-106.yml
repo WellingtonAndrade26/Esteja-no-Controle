@@ -1,0 +1,131 @@
+name: Atualizar Esteja no Controle 1.0.6
+
+on:
+  push:
+    paths:
+      - '.enc-update-106-trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  update-app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Aplicar atualização 1.0.6
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import re
+
+          app_path = Path('js/app.js')
+          app = app_path.read_text(encoding='utf-8')
+
+          app = app.replace(
+              'const APP_VERSION = window.ENC_CONFIG?.appVersion || "1.0.5";',
+              'const APP_VERSION = window.ENC_CONFIG?.appVersion || "1.0.6";'
+          )
+
+          card_needle = '<span class="card-stage-glow"></span></div>\n        <section class="card section-card card-highlight">'
+          card_replacement = '<span class="card-stage-glow"></span></div>\n        <div class="card-management-actions"><button class="secondary-button" data-edit-entity="card" data-id="${card.id}">Editar cartão</button><button class="danger-outline-button" data-delete-entity="card" data-id="${card.id}">Excluir cartão</button></div>\n        <section class="card section-card card-highlight">'
+          if 'class="card-management-actions"' not in app:
+              if card_needle not in app:
+                  raise SystemExit('Não encontrei o ponto de inserção dos botões do cartão.')
+              app = app.replace(card_needle, card_replacement, 1)
+
+          new_delete = r'''  async function deleteEntity(entity,id) {
+            const existing=getEntity(entity,id);if(!existing)return;
+            const label=existing.name||existing.description||existing.category||entityTitle(entity);
+            if(entity==="account"){
+              if(existing.primary){showToast("A conta principal não pode ser excluída.","error");return;}
+              if((state.transactions||[]).some(t=>String(t.accountId)===String(id))){showToast("Existem transações vinculadas a esta conta.","error");return;}
+            }
+            let confirmMessage=`Excluir “${label}”?`;
+            if(entity==="card"){
+              const purchaseCount=(state.cardPurchases||[]).filter(p=>String(p.cardId)===String(id)).length;
+              const paymentCount=(state.invoicePayments||[]).filter(p=>String(p.cardId)===String(id)).length;
+              const installmentCount=(state.installments||[]).filter(i=>String(i.cardId)===String(id)).length;
+              const details=[];
+              if(purchaseCount)details.push(`${purchaseCount} compra${purchaseCount!==1?"s":""}/lançamento${purchaseCount!==1?"s":""} de fatura`);
+              if(paymentCount)details.push(`${paymentCount} pagamento${paymentCount!==1?"s":""} de fatura`);
+              confirmMessage=`Excluir o cartão “${label}”?${details.length?`\n\nTambém serão excluídos: ${details.join(" e ")}.`:""}${installmentCount?`\n${installmentCount} parcelamento${installmentCount!==1?"s":""} continuará${installmentCount!==1?"ão":"á"} cadastrado${installmentCount!==1?"s":""}, mas sem cartão vinculado.`:""}\n\nEsta ação não pode ser desfeita.`;
+            }
+            if(!confirm(confirmMessage))return;
+            try{
+              if(runtimeMode==="cloud"){await cloud.deleteEntity(entity,existing.id);await refreshCloudState();}
+              else{
+                if(entity==="goalContribution"){
+                  const goal=(state.goals||[]).find(g=>String(g.id)===String(existing.goalId));if(goal)goal.current=Math.max(0,Number(goal.current||0)-Number(existing.amount||0));
+                }
+                if(entity==="card"){
+                  state.cardPurchases=(state.cardPurchases||[]).filter(p=>String(p.cardId)!==String(id));
+                  state.invoicePayments=(state.invoicePayments||[]).filter(p=>String(p.cardId)!==String(id));
+                  state.installments=(state.installments||[]).map(i=>String(i.cardId)===String(id)?{...i,cardId:null,paymentMethod:i.paymentMethod==="credit_card"?"other":i.paymentMethod}:i);
+                }
+                const key=entityArrays[entity];state[key]=(state[key]||[]).filter(x=>String(x.id)!==String(id));
+                if(entity==="cardPurchase"){const c=cardById(existing.cardId);if(c)c.currentInvoice=cardInvoiceTotal(existing.cardId);}
+                if(entity==="card"){selectedCardId=state.cards?.[0]?.id||null;selectedInvoiceMonth=ym();cardPurchaseSearch="";cardPurchaseFilter="all";}
+                syncLegacyAccountBalance();saveLocalState();renderAll();
+              }
+              showToast(entity==="card"?"Cartão excluído.":`${entityTitle(entity)} excluído.`,"success");
+            }catch(err){console.error(err);showToast(err.message||"Não foi possível excluir.","error");}
+          }
+'''
+
+          pattern = re.compile(r'  async function deleteEntity\(entity,id\) \{.*?\n  \}\n\n(?=  async function setAccountBalance\(\) \{)', re.S)
+          if 'let confirmMessage=`Excluir “${label}”?`;' not in app:
+              app, count = pattern.subn(new_delete + '\n', app, count=1)
+              if count != 1:
+                  raise SystemExit('Não consegui atualizar a rotina de exclusão.')
+
+          app_path.write_text(app, encoding='utf-8')
+
+          css_path = Path('css/styles.css')
+          css = css_path.read_text(encoding='utf-8')
+          css_block = r'''
+
+/* Produção 1.0.6 — gerenciamento e exclusão segura de cartões */
+.card-management-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:10px 0 12px}
+.danger-outline-button{appearance:none;border:1px solid color-mix(in srgb,var(--red) 58%,transparent);background:color-mix(in srgb,var(--red) 8%,transparent);color:var(--red);border-radius:11px;padding:10px 12px;font:inherit;font-size:.72rem;font-weight:700;cursor:pointer;transition:.18s ease}
+.danger-outline-button:hover{background:color-mix(in srgb,var(--red) 14%,transparent);transform:translateY(-1px)}
+.danger-outline-button:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+@media(max-width:700px){.card-management-actions{grid-template-columns:1fr}}
+'''
+          if 'Produção 1.0.6 — gerenciamento e exclusão segura de cartões' not in css:
+              css_path.write_text(css.rstrip() + css_block + '\n', encoding='utf-8')
+
+          config_path = Path('js/config.js')
+          config = config_path.read_text(encoding='utf-8').replace('appVersion: "1.0.5"', 'appVersion: "1.0.6"')
+          config_path.write_text(config, encoding='utf-8')
+
+          version_path = Path('version.json')
+          version = json.loads(version_path.read_text(encoding='utf-8'))
+          version.update({'version': '1.0.6', 'build': '2026-08-31', 'channel': 'stable'})
+          version_path.write_text(json.dumps(version, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          sw_path = Path('service-worker.js')
+          sw = sw_path.read_text(encoding='utf-8')
+          sw = re.sub(r'const CACHE = "esteja-no-controle-[^"]+";', 'const CACHE = "esteja-no-controle-1-0-6";', sw, count=1)
+          sw_path.write_text(sw, encoding='utf-8')
+          PY
+
+          node --check js/app.js
+          git diff --check
+
+      - name: Publicar arquivos atualizados
+        shell: bash
+        run: |
+          git config user.name "Esteja no Controle Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add js/app.js js/config.js css/styles.css version.json service-worker.js
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteração necessária."
+            exit 0
+          fi
+          git commit -m "Atualizar app para 1.0.6"
+          git push origin HEAD:main
