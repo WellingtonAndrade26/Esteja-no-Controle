@@ -60,6 +60,97 @@
     }
   }
 
+  function parseBrl(text) {
+    const match = String(text || "").match(/R\$\s*([\d.]+,\d{2})/i);
+    if (!match) return 0;
+    return Number(match[1].replace(/\./g, "").replace(",", ".")) || 0;
+  }
+
+  function formatBrl(value) {
+    return new Intl.NumberFormat("pt-BR", {style:"currency", currency:"BRL"}).format(Number(value || 0));
+  }
+
+  function currentMonthKey() {
+    const date = new Date();
+    return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`;
+  }
+
+  function monthLabelFromKey(key) {
+    const [year, month] = String(key || "").split("-").map(Number);
+    if (!year || !month) return "";
+    return new Intl.DateTimeFormat("pt-BR", {month:"short", year:"2-digit"})
+      .format(new Date(year, month-1, 1))
+      .replace(" de ", "/");
+  }
+
+  function invoiceTabInfo(button) {
+    const key = String(button?.dataset.selectInvoice || "").slice(0,7);
+    const small = button?.querySelector("small")?.textContent?.trim() || "";
+    const status = small.split("·")[0]?.trim() || "Fatura";
+    return {button, key, status, balance:parseBrl(small)};
+  }
+
+  function pendingInvoiceInfo() {
+    const page = document.getElementById("page-cards");
+    if (!page?.classList.contains("is-active")) return null;
+    const tabs = [...page.querySelectorAll('.invoice-month-tab[data-select-invoice]')]
+      .map(invoiceTabInfo)
+      .filter(item => item.key)
+      .sort((a,b) => a.key.localeCompare(b.key));
+    if (!tabs.length) return null;
+
+    const current = currentMonthKey();
+    const unpaidPastOrCurrent = tabs.filter(item => item.balance > 0.005 && item.key <= current && !/paga/i.test(item.status));
+    const unpaidFuture = tabs.filter(item => item.balance > 0.005 && item.key > current && !/paga/i.test(item.status));
+    const chosen = unpaidPastOrCurrent[0] || unpaidFuture[0] || tabs.find(item => item.key === current) || tabs.find(item => item.button.classList.contains("is-active")) || tabs[0];
+    if (!chosen) return null;
+
+    const label = chosen.key < current ? "Fatura em aberto" : chosen.key > current ? "Próxima fatura" : "Fatura atual";
+    return {...chosen, label};
+  }
+
+  function syncInvoiceSummary() {
+    const page = document.getElementById("page-cards");
+    if (!page?.classList.contains("is-active")) return;
+    const info = pendingInvoiceInfo();
+    if (!info) return;
+
+    const overview = page.querySelectorAll(".cards-overview-item")[1];
+    if (overview) {
+      const label = overview.querySelector("small");
+      const value = overview.querySelector("strong");
+      const detail = overview.querySelector("span");
+      if (label) label.textContent = info.label;
+      if (value) {
+        value.textContent = formatBrl(info.balance);
+        value.classList.toggle("warn", info.balance > 0.005);
+        value.classList.toggle("income", info.balance <= 0.005);
+      }
+      if (detail) detail.textContent = `${info.status} · ${monthLabelFromKey(info.key)}`;
+    }
+
+    const highlight = page.querySelector(".cards-primary .card-highlight");
+    if (highlight) {
+      const kicker = highlight.querySelector(".premium-kicker");
+      const stats = [...highlight.querySelectorAll(".cc-stat")];
+      const invoiceStat = stats.find(item => /fatura a pagar/i.test(item.querySelector("small")?.textContent || ""));
+      const value = invoiceStat?.querySelector("strong");
+      if (kicker) kicker.textContent = `${info.label} · ${info.status} · ${monthLabelFromKey(info.key)}`;
+      if (value) {
+        value.textContent = formatBrl(info.balance);
+        value.classList.toggle("warn", info.balance > 0.005);
+        value.classList.toggle("income", info.balance <= 0.005);
+      }
+    }
+  }
+
+  function scheduleCardUi() {
+    [0, 40, 140, 400].forEach(delay => setTimeout(() => {
+      ensureActions();
+      syncInvoiceSummary();
+    }, delay));
+  }
+
   function readLocalState() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -126,7 +217,10 @@
     const month = invoiceMonthFor(dateValue, card?.closingDay || 25);
     if (!cardId || !month) return;
     sessionStorage.setItem(PENDING_KEY, JSON.stringify({cardId, invoiceMonth:month, at:Date.now()}));
-    [350, 800, 1500, 2600].forEach(delay => setTimeout(openPendingPurchaseView, delay));
+    [350, 800, 1500, 2600].forEach(delay => setTimeout(() => {
+      openPendingPurchaseView();
+      syncInvoiceSummary();
+    }, delay));
   }
 
   function openPendingPurchaseView() {
@@ -157,12 +251,15 @@
     if (!invoiceButton) return;
     if (!invoiceButton.classList.contains("is-active")) invoiceButton.click();
     sessionStorage.removeItem(PENDING_KEY);
-    setTimeout(() => document.getElementById("invoiceDetail")?.scrollIntoView({behavior:"smooth",block:"start"}), 80);
+    setTimeout(() => {
+      syncInvoiceSummary();
+      document.getElementById("invoiceDetail")?.scrollIntoView({behavior:"smooth",block:"start"});
+    }, 80);
   }
 
   function start() {
     injectStyles();
-    setTimeout(ensureActions, 0);
+    scheduleCardUi();
 
     document.addEventListener("click", event => {
       const remove = event.target.closest("[data-enhanced-delete-card]");
@@ -173,9 +270,8 @@
         return;
       }
 
-      if (event.target.closest('[data-page-target="cards"], [data-select-card]')) {
-        setTimeout(ensureActions, 30);
-        setTimeout(ensureActions, 150);
+      if (event.target.closest('[data-page-target="cards"], [data-select-card], [data-select-invoice], [data-scroll-invoice]')) {
+        scheduleCardUi();
       }
     });
 
