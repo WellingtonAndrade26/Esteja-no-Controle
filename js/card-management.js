@@ -2,9 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "estejaNoControle.app";
-  const PENDING_PURCHASE_KEY = "enc.pendingPurchaseView";
-  let scheduled = false;
-  let applyingPendingView = false;
+  const PENDING_KEY = "enc.pendingPurchaseView";
 
   function injectStyles() {
     if (document.getElementById("enc-card-management-style")) return;
@@ -15,18 +13,16 @@
       .danger-outline-button{appearance:none;border:1px solid rgba(244,82,99,.58);background:rgba(244,82,99,.08);color:var(--red,#f45263);border-radius:11px;padding:10px 12px;font:inherit;font-size:.72rem;font-weight:700;cursor:pointer;transition:.18s ease}
       .danger-outline-button:hover{background:rgba(244,82,99,.14);transform:translateY(-1px)}
       .danger-outline-button:focus-visible{outline:2px solid var(--red,#f45263);outline-offset:2px}
-      .purchase-card-note{display:block;margin:-5px 0 12px;color:var(--muted,#8295a8);font-size:.62rem;line-height:1.45}
-      .purchase-card-note strong{color:var(--text,#fff)}
-      #entityForm[data-entity="cardPurchase"] select[name="cardId"][data-enc-locked="1"]{pointer-events:none;opacity:.88}
       @media(max-width:700px){.card-management-actions{grid-template-columns:1fr}}
     `;
     document.head.appendChild(style);
   }
 
   function selectedCardInfo() {
-    const selected = document.querySelector('#page-cards .card-selector-item.is-active[data-select-card]');
+    const page = document.getElementById("page-cards");
+    const selected = page?.querySelector('.card-selector-item.is-active[data-select-card]');
     if (!selected) return null;
-    const stats = [...document.querySelectorAll('#page-cards .invoice-grid .invoice-stat')];
+    const stats = [...page.querySelectorAll(".invoice-grid .invoice-stat")];
     const closingStat = stats.find(item => /fecha dia/i.test(item.querySelector("small")?.textContent || ""));
     const closingDay = Number((closingStat?.querySelector("strong")?.textContent || "").replace(/\D/g, "")) || 25;
     return {
@@ -36,96 +32,10 @@
     };
   }
 
-  function addMonths(monthKey, offset) {
-    const [year, month] = String(monthKey).slice(0, 7).split("-").map(Number);
-    const date = new Date(year, month - 1 + offset, 1);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-  }
-
-  function invoiceMonthFor(dateValue, closingDay) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateValue || ""));
-    if (!match) return "";
-    const base = `${match[1]}-${match[2]}`;
-    return Number(match[3]) > Number(closingDay || 25) ? addMonths(base, 1) : base;
-  }
-
-  function monthLabel(monthKey) {
-    const [year, month] = String(monthKey).split("-").map(Number);
-    if (!year || !month) return monthKey;
-    return new Intl.DateTimeFormat("pt-BR", { month: "short", year: "2-digit" })
-      .format(new Date(year, month - 1, 1))
-      .replace(" de ", "/");
-  }
-
-  function readLocalState() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  }
-
-  function deleteCardFromLocalState(cardId) {
-    const state = readLocalState();
-    if (!state) throw new Error("Não foi possível localizar os dados locais do aplicativo.");
-
-    state.cards = (state.cards || []).filter(card => String(card.id) !== String(cardId));
-    state.cardPurchases = (state.cardPurchases || []).filter(item => String(item.cardId) !== String(cardId));
-    state.invoicePayments = (state.invoicePayments || []).filter(item => String(item.cardId) !== String(cardId));
-    state.installments = (state.installments || []).map(item => {
-      if (String(item.cardId) !== String(cardId)) return item;
-      return {
-        ...item,
-        cardId: null,
-        paymentMethod: item.paymentMethod === "credit_card" ? "other" : item.paymentMethod
-      };
-    });
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }
-
-  async function deleteCard(cardId, cardName, button) {
-    const confirmed = window.confirm(
-      `Excluir o cartão “${cardName}”?\n\n` +
-      "As compras e os pagamentos de fatura vinculados a ele também serão excluídos. " +
-      "Parcelamentos continuarão cadastrados, mas ficarão sem cartão associado.\n\n" +
-      "Esta ação não pode ser desfeita."
-    );
-    if (!confirmed) return;
-
-    const oldText = button.textContent;
-    button.disabled = true;
-    button.textContent = "Excluindo...";
-
-    try {
-      const cloud = window.ENCCloud;
-      let session = null;
-      if (cloud?.configured && typeof cloud.getSession === "function") {
-        try { session = await cloud.getSession(); } catch { session = null; }
-      }
-
-      if (session?.user && typeof cloud?.deleteEntity === "function") {
-        await cloud.deleteEntity("card", cardId);
-      } else {
-        deleteCardFromLocalState(cardId);
-      }
-
-      sessionStorage.removeItem(PENDING_PURCHASE_KEY);
-      location.reload();
-    } catch (error) {
-      console.error("Falha ao excluir cartão", error);
-      button.disabled = false;
-      button.textContent = oldText;
-      window.alert(error?.message || "Não foi possível excluir o cartão agora.");
-    }
-  }
-
   function ensureActions() {
     injectStyles();
     const page = document.getElementById("page-cards");
-    if (!page) return;
-
+    if (!page?.classList.contains("is-active")) return;
     const stage = page.querySelector(".cards-primary .credit-card-stage");
     const card = selectedCardInfo();
     if (!stage || !card?.id) return;
@@ -143,74 +53,88 @@
 
     const edit = actions.querySelector('[data-edit-entity="card"]');
     const remove = actions.querySelector("[data-enhanced-delete-card]");
-    if (edit && edit.dataset.id !== String(card.id)) edit.dataset.id = card.id;
+    if (edit) edit.dataset.id = card.id;
     if (remove) {
-      if (remove.dataset.enhancedDeleteCard !== String(card.id)) remove.dataset.enhancedDeleteCard = card.id;
-      if (remove.dataset.cardName !== card.name) remove.dataset.cardName = card.name;
+      remove.dataset.enhancedDeleteCard = card.id;
+      remove.dataset.cardName = card.name;
     }
   }
 
-  function updatePurchaseNote(form, card) {
-    const dateInput = form.querySelector('input[name="date"]');
-    const targetMonth = invoiceMonthFor(dateInput?.value, card?.closingDay);
-    let note = form.querySelector(".purchase-card-note");
-    if (!note) {
-      note = document.createElement("small");
-      note.className = "purchase-card-note";
-      const cardField = form.querySelector('select[name="cardId"]')?.closest(".field");
-      if (!cardField) return;
-      cardField.insertAdjacentElement("afterend", note);
+  function readLocalState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
     }
-
-    const html = `Compra vinculada a <strong>${card?.name || "cartão selecionado"}</strong>${targetMonth ? ` · fatura <strong>${monthLabel(targetMonth)}</strong>` : ""}.`;
-    if (note.innerHTML !== html) note.innerHTML = html;
   }
 
-  function bindPurchaseForm() {
-    const form = document.getElementById("entityForm");
-    const backdrop = document.getElementById("entityModalBackdrop");
-    if (!form || !backdrop || backdrop.hidden || form.dataset.entity !== "cardPurchase" || form.dataset.id) return;
+  function deleteCardFromLocalState(cardId) {
+    const state = readLocalState();
+    if (!state) throw new Error("Não foi possível localizar os dados locais do aplicativo.");
+    state.cards = (state.cards || []).filter(card => String(card.id) !== String(cardId));
+    state.cardPurchases = (state.cardPurchases || []).filter(item => String(item.cardId) !== String(cardId));
+    state.invoicePayments = (state.invoicePayments || []).filter(item => String(item.cardId) !== String(cardId));
+    state.installments = (state.installments || []).map(item => String(item.cardId) === String(cardId)
+      ? {...item, cardId:null, paymentMethod:item.paymentMethod === "credit_card" ? "other" : item.paymentMethod}
+      : item);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
 
-    const card = selectedCardInfo();
-    const select = form.querySelector('select[name="cardId"]');
-    if (!card?.id || !select) return;
+  async function deleteCard(cardId, cardName, button) {
+    if (!window.confirm(`Excluir o cartão “${cardName}”?\n\nCompras e pagamentos de fatura vinculados a ele também serão excluídos. Parcelamentos continuarão cadastrados, mas sem cartão associado.\n\nEsta ação não pode ser desfeita.`)) return;
 
-    if (select.value !== String(card.id)) select.value = card.id;
-    select.dataset.encLocked = "1";
-    select.setAttribute("aria-readonly", "true");
-    form.dataset.encBoundCardId = card.id;
-    form.dataset.encClosingDay = String(card.closingDay || 25);
-    updatePurchaseNote(form, card);
+    const oldText = button.textContent;
+    button.disabled = true;
+    button.textContent = "Excluindo...";
+    try {
+      const cloud = window.ENCCloud;
+      let session = null;
+      if (cloud?.configured && typeof cloud.getSession === "function") {
+        try { session = await cloud.getSession(); } catch {}
+      }
+      if (session?.user && typeof cloud?.deleteEntity === "function") await cloud.deleteEntity("card", cardId);
+      else deleteCardFromLocalState(cardId);
+      sessionStorage.removeItem(PENDING_KEY);
+      location.reload();
+    } catch (error) {
+      console.error("Falha ao excluir cartão", error);
+      button.disabled = false;
+      button.textContent = oldText;
+      window.alert(error?.message || "Não foi possível excluir o cartão agora.");
+    }
+  }
+
+  function addMonths(monthKey, offset) {
+    const [year, month] = String(monthKey).slice(0,7).split("-").map(Number);
+    const date = new Date(year, month - 1 + offset, 1);
+    return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`;
+  }
+
+  function invoiceMonthFor(dateValue, closingDay) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateValue || ""));
+    if (!match) return "";
+    const base = `${match[1]}-${match[2]}`;
+    return Number(match[3]) > Number(closingDay || 25) ? addMonths(base, 1) : base;
   }
 
   function rememberPurchaseDestination(form) {
     if (form.dataset.entity !== "cardPurchase" || form.dataset.id) return;
-    bindPurchaseForm();
-
     const card = selectedCardInfo();
-    const select = form.querySelector('select[name="cardId"]');
-    if (card?.id && select) select.value = card.id;
-
-    const cardId = card?.id || select?.value;
+    const cardId = form.querySelector('select[name="cardId"]')?.value || card?.id;
     const dateValue = form.querySelector('input[name="date"]')?.value;
-    const targetMonth = invoiceMonthFor(dateValue, Number(form.dataset.encClosingDay || card?.closingDay || 25));
-    if (!cardId || !targetMonth) return;
-
-    sessionStorage.setItem(PENDING_PURCHASE_KEY, JSON.stringify({
-      cardId,
-      invoiceMonth: targetMonth,
-      at: Date.now()
-    }));
+    const month = invoiceMonthFor(dateValue, card?.closingDay || 25);
+    if (!cardId || !month) return;
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify({cardId, invoiceMonth:month, at:Date.now()}));
+    [350, 800, 1500, 2600].forEach(delay => setTimeout(openPendingPurchaseView, delay));
   }
 
-  function restorePendingPurchaseView() {
-    if (applyingPendingView) return;
-
+  function openPendingPurchaseView() {
     let pending = null;
-    try { pending = JSON.parse(sessionStorage.getItem(PENDING_PURCHASE_KEY) || "null"); } catch { pending = null; }
+    try { pending = JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null"); } catch {}
     if (!pending?.cardId || !pending?.invoiceMonth) return;
     if (Date.now() - Number(pending.at || 0) > 120000) {
-      sessionStorage.removeItem(PENDING_PURCHASE_KEY);
+      sessionStorage.removeItem(PENDING_KEY);
       return;
     }
 
@@ -219,76 +143,47 @@
     const page = document.getElementById("page-cards");
     if (!page?.classList.contains("is-active")) return;
 
-    applyingPendingView = true;
-    try {
-      const active = selectedCardInfo();
-      if (!active || String(active.id) !== String(pending.cardId)) {
-        const cardButton = [...page.querySelectorAll("[data-select-card]")]
-          .find(button => String(button.dataset.selectCard) === String(pending.cardId));
-        if (cardButton) cardButton.click();
-        else sessionStorage.removeItem(PENDING_PURCHASE_KEY);
-        return;
+    const active = selectedCardInfo();
+    if (!active || String(active.id) !== String(pending.cardId)) {
+      const cardButton = [...page.querySelectorAll("[data-select-card]")].find(btn => String(btn.dataset.selectCard) === String(pending.cardId));
+      if (cardButton) {
+        cardButton.click();
+        setTimeout(openPendingPurchaseView, 80);
       }
-
-      const invoiceButton = [...page.querySelectorAll("[data-select-invoice]")]
-        .find(button => String(button.dataset.selectInvoice) === String(pending.invoiceMonth));
-      if (!invoiceButton) return;
-      if (!invoiceButton.classList.contains("is-active")) invoiceButton.click();
-      sessionStorage.removeItem(PENDING_PURCHASE_KEY);
-      setTimeout(() => document.getElementById("invoiceDetail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
-    } finally {
-      applyingPendingView = false;
+      return;
     }
-  }
 
-  function syncUi() {
-    ensureActions();
-    bindPurchaseForm();
-    restorePendingPurchaseView();
-  }
-
-  function scheduleSync() {
-    if (scheduled) return;
-    scheduled = true;
-    requestAnimationFrame(() => {
-      scheduled = false;
-      syncUi();
-    });
+    const invoiceButton = [...page.querySelectorAll("[data-select-invoice]")].find(btn => String(btn.dataset.selectInvoice) === String(pending.invoiceMonth));
+    if (!invoiceButton) return;
+    if (!invoiceButton.classList.contains("is-active")) invoiceButton.click();
+    sessionStorage.removeItem(PENDING_KEY);
+    setTimeout(() => document.getElementById("invoiceDetail")?.scrollIntoView({behavior:"smooth",block:"start"}), 80);
   }
 
   function start() {
-    syncUi();
-
-    const observer = new MutationObserver(scheduleSync);
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class"] });
+    injectStyles();
+    setTimeout(ensureActions, 0);
 
     document.addEventListener("click", event => {
-      const removeButton = event.target.closest("[data-enhanced-delete-card]");
-      if (removeButton) {
+      const remove = event.target.closest("[data-enhanced-delete-card]");
+      if (remove) {
         event.preventDefault();
         event.stopPropagation();
-        deleteCard(removeButton.dataset.enhancedDeleteCard, removeButton.dataset.cardName || "Cartão", removeButton);
+        deleteCard(remove.dataset.enhancedDeleteCard, remove.dataset.cardName || "Cartão", remove);
         return;
       }
 
-      if (event.target.closest("[data-create-card-purchase]")) {
-        setTimeout(bindPurchaseForm, 0);
+      if (event.target.closest('[data-page-target="cards"], [data-select-card]')) {
+        setTimeout(ensureActions, 30);
+        setTimeout(ensureActions, 150);
       }
-    }, true);
-
-    document.addEventListener("input", event => {
-      if (event.target.matches('#entityForm[data-entity="cardPurchase"] input[name="date"]')) {
-        const form = document.getElementById("entityForm");
-        const card = selectedCardInfo();
-        if (form && card) updatePurchaseNote(form, card);
-      }
-    }, true);
+    });
 
     document.addEventListener("submit", event => {
       if (event.target?.id === "entityForm") rememberPurchaseDestination(event.target);
     }, true);
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, {once:true});
   else start();
 })();
