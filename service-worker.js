@@ -13,6 +13,7 @@ const CORE = [
   "./js/app.js",
   "./js/finance-core.js",
   "./js/icons.js",
+  "./js/card-management.js",
   "./manifest.json",
   "./assets/icon-192.png",
   "./assets/icon-512.png",
