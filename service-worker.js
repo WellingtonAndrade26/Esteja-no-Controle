@@ -1,4 +1,4 @@
-const CACHE = "esteja-no-controle-1-0-10";
+const CACHE = "esteja-no-controle-1-0-11";
 const CORE = [
   "./",
   "./index.html",
@@ -14,6 +14,7 @@ const CORE = [
   "./js/finance-core.js",
   "./js/icons.js",
   "./js/card-management.js",
+  "./js/card-limit-sync.js",
   "./manifest.json",
   "./assets/icon-192.png",
   "./assets/icon-512.png",
