@@ -3,6 +3,7 @@
 
   const STORAGE_KEY = "estejaNoControle.app";
   const PENDING_PURCHASE_KEY = "enc.pendingPurchaseView";
+  let scheduled = false;
   let applyingPendingView = false;
 
   function injectStyles() {
@@ -16,6 +17,7 @@
       .danger-outline-button:focus-visible{outline:2px solid var(--red,#f45263);outline-offset:2px}
       .purchase-card-note{display:block;margin:-5px 0 12px;color:var(--muted,#8295a8);font-size:.62rem;line-height:1.45}
       .purchase-card-note strong{color:var(--text,#fff)}
+      #entityForm[data-entity="cardPurchase"] select[name="cardId"][data-enc-locked="1"]{pointer-events:none;opacity:.88}
       @media(max-width:700px){.card-management-actions{grid-template-columns:1fr}}
     `;
     document.head.appendChild(style);
@@ -121,7 +123,6 @@
 
   function ensureActions() {
     injectStyles();
-
     const page = document.getElementById("page-cards");
     if (!page) return;
 
@@ -129,25 +130,24 @@
     const card = selectedCardInfo();
     if (!stage || !card?.id) return;
 
-    const existing = page.querySelector(".card-management-actions");
-    if (existing) {
-      const edit = existing.querySelector('[data-edit-entity="card"]');
-      const remove = existing.querySelector("[data-enhanced-delete-card]");
-      if (edit) edit.dataset.id = card.id;
-      if (remove) {
-        remove.dataset.enhancedDeleteCard = card.id;
-        remove.dataset.cardName = card.name;
-      }
-      return;
+    let actions = page.querySelector(".card-management-actions");
+    if (!actions) {
+      actions = document.createElement("div");
+      actions.className = "card-management-actions";
+      actions.innerHTML = `
+        <button class="secondary-button" data-edit-entity="card">Editar cartão</button>
+        <button class="danger-outline-button" data-enhanced-delete-card>Excluir cartão</button>
+      `;
+      stage.insertAdjacentElement("afterend", actions);
     }
 
-    const actions = document.createElement("div");
-    actions.className = "card-management-actions";
-    actions.innerHTML = `
-      <button class="secondary-button" data-edit-entity="card" data-id="${card.id}">Editar cartão</button>
-      <button class="danger-outline-button" data-enhanced-delete-card="${card.id}" data-card-name="${card.name.replace(/&/g,"&amp;").replace(/"/g,"&quot;")}">Excluir cartão</button>
-    `;
-    stage.insertAdjacentElement("afterend", actions);
+    const edit = actions.querySelector('[data-edit-entity="card"]');
+    const remove = actions.querySelector("[data-enhanced-delete-card]");
+    if (edit && edit.dataset.id !== String(card.id)) edit.dataset.id = card.id;
+    if (remove) {
+      if (remove.dataset.enhancedDeleteCard !== String(card.id)) remove.dataset.enhancedDeleteCard = card.id;
+      if (remove.dataset.cardName !== card.name) remove.dataset.cardName = card.name;
+    }
   }
 
   function updatePurchaseNote(form, card) {
@@ -158,54 +158,54 @@
       note = document.createElement("small");
       note.className = "purchase-card-note";
       const cardField = form.querySelector('select[name="cardId"]')?.closest(".field");
-      cardField?.insertAdjacentElement("afterend", note);
+      if (!cardField) return;
+      cardField.insertAdjacentElement("afterend", note);
     }
-    if (note) {
-      note.innerHTML = `Compra vinculada a <strong>${card?.name || "cartão selecionado"}</strong>${targetMonth ? ` · fatura <strong>${monthLabel(targetMonth)}</strong>` : ""}.`;
-    }
+
+    const html = `Compra vinculada a <strong>${card?.name || "cartão selecionado"}</strong>${targetMonth ? ` · fatura <strong>${monthLabel(targetMonth)}</strong>` : ""}.`;
+    if (note.innerHTML !== html) note.innerHTML = html;
   }
 
-  function ensurePurchaseBinding() {
+  function bindPurchaseForm() {
     const form = document.getElementById("entityForm");
     const backdrop = document.getElementById("entityModalBackdrop");
-    if (!form || backdrop?.hidden || form.dataset.entity !== "cardPurchase" || form.dataset.id) return;
+    if (!form || !backdrop || backdrop.hidden || form.dataset.entity !== "cardPurchase" || form.dataset.id) return;
 
     const card = selectedCardInfo();
     const select = form.querySelector('select[name="cardId"]');
     if (!card?.id || !select) return;
 
-    select.value = card.id;
-    select.disabled = true;
-    select.setAttribute("aria-disabled", "true");
-
-    let hidden = form.querySelector('input[data-enc-card-id][name="cardId"]');
-    if (!hidden) {
-      hidden = document.createElement("input");
-      hidden.type = "hidden";
-      hidden.name = "cardId";
-      hidden.dataset.encCardId = "1";
-      form.appendChild(hidden);
-    }
-    hidden.value = card.id;
+    if (select.value !== String(card.id)) select.value = card.id;
+    select.dataset.encLocked = "1";
+    select.setAttribute("aria-readonly", "true");
     form.dataset.encBoundCardId = card.id;
     form.dataset.encClosingDay = String(card.closingDay || 25);
-
     updatePurchaseNote(form, card);
   }
 
   function rememberPurchaseDestination(form) {
     if (form.dataset.entity !== "cardPurchase" || form.dataset.id) return;
-    ensurePurchaseBinding();
+    bindPurchaseForm();
+
     const card = selectedCardInfo();
-    const cardId = form.querySelector('input[data-enc-card-id][name="cardId"]')?.value || form.querySelector('select[name="cardId"]')?.value;
+    const select = form.querySelector('select[name="cardId"]');
+    if (card?.id && select) select.value = card.id;
+
+    const cardId = card?.id || select?.value;
     const dateValue = form.querySelector('input[name="date"]')?.value;
     const targetMonth = invoiceMonthFor(dateValue, Number(form.dataset.encClosingDay || card?.closingDay || 25));
     if (!cardId || !targetMonth) return;
-    sessionStorage.setItem(PENDING_PURCHASE_KEY, JSON.stringify({ cardId, invoiceMonth: targetMonth, at: Date.now() }));
+
+    sessionStorage.setItem(PENDING_PURCHASE_KEY, JSON.stringify({
+      cardId,
+      invoiceMonth: targetMonth,
+      at: Date.now()
+    }));
   }
 
   function restorePendingPurchaseView() {
     if (applyingPendingView) return;
+
     let pending = null;
     try { pending = JSON.parse(sessionStorage.getItem(PENDING_PURCHASE_KEY) || "null"); } catch { pending = null; }
     if (!pending?.cardId || !pending?.invoiceMonth) return;
@@ -223,16 +223,15 @@
     try {
       const active = selectedCardInfo();
       if (!active || String(active.id) !== String(pending.cardId)) {
-        const cardButton = page.querySelector(`[data-select-card="${CSS.escape(String(pending.cardId))}"]`);
-        if (cardButton) {
-          cardButton.click();
-          return;
-        }
-        sessionStorage.removeItem(PENDING_PURCHASE_KEY);
+        const cardButton = [...page.querySelectorAll("[data-select-card]")]
+          .find(button => String(button.dataset.selectCard) === String(pending.cardId));
+        if (cardButton) cardButton.click();
+        else sessionStorage.removeItem(PENDING_PURCHASE_KEY);
         return;
       }
 
-      const invoiceButton = page.querySelector(`[data-select-invoice="${CSS.escape(String(pending.invoiceMonth))}"]`);
+      const invoiceButton = [...page.querySelectorAll("[data-select-invoice]")]
+        .find(button => String(button.dataset.selectInvoice) === String(pending.invoiceMonth));
       if (!invoiceButton) return;
       if (!invoiceButton.classList.contains("is-active")) invoiceButton.click();
       sessionStorage.removeItem(PENDING_PURCHASE_KEY);
@@ -242,16 +241,25 @@
     }
   }
 
-  function start() {
+  function syncUi() {
     ensureActions();
-    ensurePurchaseBinding();
+    bindPurchaseForm();
     restorePendingPurchaseView();
+  }
 
-    const observer = new MutationObserver(() => queueMicrotask(() => {
-      ensureActions();
-      ensurePurchaseBinding();
-      restorePendingPurchaseView();
-    }));
+  function scheduleSync() {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => {
+      scheduled = false;
+      syncUi();
+    });
+  }
+
+  function start() {
+    syncUi();
+
+    const observer = new MutationObserver(scheduleSync);
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class"] });
 
     document.addEventListener("click", event => {
@@ -264,13 +272,16 @@
       }
 
       if (event.target.closest("[data-create-card-purchase]")) {
-        queueMicrotask(ensurePurchaseBinding);
-        setTimeout(ensurePurchaseBinding, 0);
+        setTimeout(bindPurchaseForm, 0);
       }
     }, true);
 
     document.addEventListener("input", event => {
-      if (event.target.matches('#entityForm[data-entity="cardPurchase"] input[name="date"]')) ensurePurchaseBinding();
+      if (event.target.matches('#entityForm[data-entity="cardPurchase"] input[name="date"]')) {
+        const form = document.getElementById("entityForm");
+        const card = selectedCardInfo();
+        if (form && card) updatePurchaseNote(form, card);
+      }
     }, true);
 
     document.addEventListener("submit", event => {
