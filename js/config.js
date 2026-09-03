@@ -2,7 +2,7 @@ window.ENC_CONFIG = {
   supabaseUrl: "https://iyfknonepcarerlpcxlu.supabase.co",
   supabasePublishableKey: "sb_publishable_V4zEvBC8ZNYN8vSzmBq_rg_2EPjFqYZ",
   appName: "Esteja no Controle",
-  appVersion: "1.0.12",
+  appVersion: "1.0.13",
   publicBaseUrl: "",
   legalOwner: "Wellington Porto de Andrade",
   supportEmail: "",
@@ -14,12 +14,13 @@ window.ENC_CONFIG = {
     if (document.querySelector(`script[data-${marker}]`)) return;
     const script = document.createElement("script");
     script.src = src;
-    script.async = true;
+    script.async = false;
     script.setAttribute(`data-${marker}`, "1");
     document.head.appendChild(script);
   };
 
-  load("./js/card-management.js?v=1.0.12", "enc-card-management");
-  load("./js/card-limit-sync.js?v=1.0.12", "enc-card-limit-sync");
-  load("./js/ai-complete.js?v=1.0.12", "enc-ai-complete");
+  load("./js/card-management.js?v=1.0.13", "enc-card-management");
+  load("./js/card-limit-sync.js?v=1.0.13", "enc-card-limit-sync");
+  load("./js/ai-complete.js?v=1.0.13", "enc-ai-complete");
+  load("./js/benefits.js?v=1.0.13", "enc-benefits");
 })();
