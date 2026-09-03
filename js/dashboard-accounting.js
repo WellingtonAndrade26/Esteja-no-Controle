@@ -98,10 +98,10 @@
     const installmentsRemaining = Math.max(0, installmentCommitment - installmentExpenseAlreadyRecorded);
     const accountsTotal = (accRes.data || []).reduce((sum, row) => sum + Number(row.balance || 0), 0);
 
-    // O saldo das contas já contém entradas e despesas que realmente aconteceram.
-    // Portanto, não devemos subtrair as despesas do mês novamente.
-    // Só descontamos daqui compromissos mensais que ainda não viraram saída na conta.
-    const availableThisMonth = accountsTotal - installmentsRemaining;
+    // Regra escolhida para o Dashboard:
+    // saldo disponível = saldo informado nas contas - gastos do mês - parcelas ainda não lançadas.
+    // Vales não entram neste cálculo.
+    const availableThisMonth = accountsTotal - cashExpense - installmentsRemaining;
     const monthResult = cashIncome - cashExpense - installmentsRemaining;
 
     return {
@@ -133,7 +133,7 @@
         /saldo dispon[ií]vel/i,
         "Saldo disponível do mês",
         data.availableThisMonth,
-        `Em contas: ${money(data.accountsTotal)} · parcelas ainda a descontar: −${money(data.installmentsRemaining)}`,
+        `Em contas: ${money(data.accountsTotal)} · gastos do mês: −${money(data.cashExpense)} · parcelas: −${money(data.installmentsRemaining)}`,
         availableClass
       );
 
@@ -151,7 +151,7 @@
         /sa[ií]das\s*\+\s*parcelas|gastos\s*\+\s*parcelas/i,
         "Gastos + parcelas",
         data.cashExpense + data.installmentsRemaining,
-        `${money(data.cashExpense)} gastos + ${money(data.installmentsRemaining)} parcelas ainda não descontadas`,
+        `${money(data.cashExpense)} gastos do mês + ${money(data.installmentsRemaining)} parcelas ainda não descontadas`,
         "expense"
       );
 
