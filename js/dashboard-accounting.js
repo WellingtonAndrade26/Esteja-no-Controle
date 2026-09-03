@@ -34,6 +34,7 @@
     const style = document.createElement("style");
     style.id = "enc-dashboard-accounting-style";
     style.textContent = `
+      #page-dashboard .summary-grid{display:none!important}
       .enc-accounting-breakdown{grid-column:1/-1;margin-top:0}
       .enc-accounting-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
       .enc-accounting-head small{display:block;color:var(--muted);margin-top:4px}
@@ -86,22 +87,22 @@
     }
     if (!block) return;
 
-    const resources = data.accountsTotal + data.benefitsTotal;
+    const combinedTotal = data.monthResult + data.benefitsTotal;
     block.innerHTML = `
       <div class="enc-accounting-head">
-        <div><strong>Conferência do saldo</strong><small>Dinheiro e benefícios ficam separados para não parecer que vale pode pagar conta.</small></div>
+        <div><strong>Conferência do saldo</strong><small>Resultado do mês e vales continuam separados; o total somado serve como visão geral.</small></div>
         <span class="badge">Mês atual</span>
       </div>
       <div class="enc-accounting-grid">
+        <div class="enc-accounting-cell"><small>Resultado disponível</small><strong class="${data.monthResult < 0 ? "expense" : "income"}">${money(data.monthResult)}</strong><span>Entradas − gastos − parcelas.</span></div>
         <div class="enc-accounting-cell"><small>Entradas em dinheiro</small><strong class="income">${money(data.cashIncome)}</strong><span>Não inclui vales.</span></div>
         <div class="enc-accounting-cell"><small>Gastos realizados</small><strong class="expense">${money(data.cashExpense)}</strong><span>Saídas já registradas no mês.</span></div>
         <div class="enc-accounting-cell"><small>Parcelas ainda consideradas</small><strong class="expense">${money(data.installmentsRemaining)}</strong><span>Compromisso mensal não lançado como gasto.</span></div>
-        <div class="enc-accounting-cell"><small>Resultado disponível</small><strong class="${data.monthResult < 0 ? "expense" : "income"}">${money(data.monthResult)}</strong><span>Entradas − gastos − parcelas.</span></div>
-        <div class="enc-accounting-cell"><small>Dinheiro nas contas</small><strong>${money(data.accountsTotal)}</strong><span>Saldo bancário/carteira atual.</span></div>
+        <div class="enc-accounting-cell"><small>Total somado</small><strong class="${combinedTotal < 0 ? "expense" : "income"}">${money(combinedTotal)}</strong><span>Resultado disponível + vales.</span></div>
         <div class="enc-accounting-cell"><small>Vales separados</small><strong>${money(data.benefitsTotal)}</strong><span>Uso restrito; não paga contas comuns.</span></div>
       </div>
       <div class="enc-accounting-formula">
-        <strong>${money(data.cashIncome)}</strong> entradas − <strong>${money(data.cashExpense)}</strong> gastos − <strong>${money(data.installmentsRemaining)}</strong> parcelas = <strong class="${data.monthResult < 0 ? "expense" : "income"}">${money(data.monthResult)}</strong> disponíveis no mês. Recursos cadastrados: <strong>${money(resources)}</strong>, sendo <strong>${money(data.benefitsTotal)}</strong> restritos em vales.
+        <strong>${money(data.cashIncome)}</strong> entradas − <strong>${money(data.cashExpense)}</strong> gastos − <strong>${money(data.installmentsRemaining)}</strong> parcelas = <strong class="${data.monthResult < 0 ? "expense" : "income"}">${money(data.monthResult)}</strong> disponíveis. Somando <strong>${money(data.benefitsTotal)}</strong> em vales, o total geral é <strong class="${combinedTotal < 0 ? "expense" : "income"}">${money(combinedTotal)}</strong>.
       </div>`;
   }
 
