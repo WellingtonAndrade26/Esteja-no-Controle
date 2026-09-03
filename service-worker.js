@@ -1,4 +1,4 @@
-const CACHE = "esteja-no-controle-1-0-14";
+const CACHE = "esteja-no-controle-1-0-15";
 const CORE = [
   "./",
   "./index.html",
@@ -18,6 +18,7 @@ const CORE = [
   "./js/ai-complete.js",
   "./js/benefits.js",
   "./js/benefits-keeper.js",
+  "./js/dashboard-accounting.js",
   "./manifest.json",
   "./assets/icon-192.png",
   "./assets/icon-512.png",
