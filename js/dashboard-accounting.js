@@ -97,9 +97,21 @@
       .reduce((sum, row) => sum + Number(row.installment_amount || 0), 0);
     const installmentsRemaining = Math.max(0, installmentCommitment - installmentExpenseAlreadyRecorded);
     const accountsTotal = (accRes.data || []).reduce((sum, row) => sum + Number(row.balance || 0), 0);
+
+    // O saldo das contas já contém entradas e despesas que realmente aconteceram.
+    // Portanto, não devemos subtrair as despesas do mês novamente.
+    // Só descontamos daqui compromissos mensais que ainda não viraram saída na conta.
+    const availableThisMonth = accountsTotal - installmentsRemaining;
     const monthResult = cashIncome - cashExpense - installmentsRemaining;
 
-    return { cashIncome, cashExpense, installmentsRemaining, accountsTotal, monthResult };
+    return {
+      cashIncome,
+      cashExpense,
+      installmentsRemaining,
+      accountsTotal,
+      availableThisMonth,
+      monthResult
+    };
   }
 
   async function sync(force = false) {
@@ -113,15 +125,16 @@
       if (!data || !page.classList.contains("is-active")) return;
 
       cleanupDashboard(page);
+      const availableClass = data.availableThisMonth < 0 ? "expense" : "income";
       const resultClass = data.monthResult < 0 ? "expense" : "income";
 
       setMetricByLabel(
         page,
         /saldo dispon[ií]vel/i,
         "Saldo disponível do mês",
-        data.monthResult,
-        `${money(data.cashIncome)} entradas − ${money(data.cashExpense)} gastos − ${money(data.installmentsRemaining)} parcelas`,
-        resultClass
+        data.availableThisMonth,
+        `Em contas: ${money(data.accountsTotal)} · parcelas ainda a descontar: −${money(data.installmentsRemaining)}`,
+        availableClass
       );
 
       setMetricByLabel(
@@ -138,7 +151,7 @@
         /sa[ií]das\s*\+\s*parcelas|gastos\s*\+\s*parcelas/i,
         "Gastos + parcelas",
         data.cashExpense + data.installmentsRemaining,
-        `${money(data.cashExpense)} gastos + ${money(data.installmentsRemaining)} parcelas`,
+        `${money(data.cashExpense)} gastos + ${money(data.installmentsRemaining)} parcelas ainda não descontadas`,
         "expense"
       );
 
@@ -161,7 +174,7 @@
           strong.classList.remove("income", "expense");
           strong.classList.add(resultClass);
         }
-        if (span) span.textContent = "Entradas em dinheiro − gastos realizados − parcelas";
+        if (span) span.textContent = "Entradas do mês − gastos do mês − parcelas ainda não lançadas";
       }
     } catch (error) {
       console.error("Falha ao atualizar resumo financeiro do dashboard", error);
