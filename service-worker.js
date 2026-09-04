@@ -1,4 +1,4 @@
-const CACHE = "esteja-no-controle-1-0-20";
+const CACHE = "esteja-no-controle-1-0-21";
 const CORE = [
   "./",
   "./index.html",
