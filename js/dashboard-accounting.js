@@ -66,12 +66,10 @@
   }
 
   async function readData() {
-    const cloud = window.ENCCloud;
-    const client = cloud?.client;
+    const client = window.ENCCloud?.client;
     if (!client) return null;
     const { data: authData } = await client.auth.getUser();
-    const user = authData?.user;
-    if (!user) return null;
+    if (!authData?.user) return null;
 
     const { start, end } = monthRange();
     const [txRes, instRes, accRes] = await Promise.all([
@@ -81,8 +79,7 @@
         .lt("occurred_on", end),
       client.from("installments")
         .select("installment_amount,installments_paid,installments_total"),
-      client.from("accounts")
-        .select("balance")
+      client.from("accounts").select("balance")
     ]);
 
     const firstError = [txRes, instRes, accRes].find(r => r?.error)?.error;
@@ -102,14 +99,19 @@
       .filter(row => Number(row.installments_paid || 0) < Number(row.installments_total || 0))
       .reduce((sum, row) => sum + Number(row.installment_amount || 0), 0);
     const installmentsRemaining = Math.max(0, installmentCommitment - installmentExpenseAlreadyRecorded);
-    const accountsTotal = (accRes.data || []).reduce((sum, row) => sum + Number(row.balance || 0), 0);
-    const monthResult = cashIncome - cashExpense - installmentsRemaining;
+    const currentBalance = (accRes.data || []).reduce((sum, row) => sum + Number(row.balance || 0), 0);
+
+    // O saldo atual já recebeu as entradas e já perdeu os gastos realizados no mês.
+    // Reconstruímos o saldo do início do mês para apresentar o resultado completo sem duplicar lançamentos.
+    const openingBalance = currentBalance - cashIncome + cashExpense;
+    const monthResult = openingBalance + cashIncome - cashExpense - installmentsRemaining;
 
     return {
       cashIncome,
       cashExpense,
       installmentsRemaining,
-      accountsTotal,
+      currentBalance,
+      openingBalance,
       monthResult
     };
   }
@@ -132,7 +134,7 @@
         /saldo dispon[ií]vel|resultado do m[eê]s/i,
         "Resultado do mês",
         data.monthResult,
-        `${money(data.cashIncome)} entradas − ${money(data.cashExpense)} gastos − ${money(data.installmentsRemaining)} parcelas`,
+        `${money(data.openingBalance)} saldo inicial + ${money(data.cashIncome)} entradas − ${money(data.cashExpense)} gastos − ${money(data.installmentsRemaining)} parcelas`,
         resultClass
       );
 
@@ -156,11 +158,11 @@
 
       setMetricByLabel(
         page,
-        /saldo projetado|dinheiro nas contas|saldo atual nas contas/i,
-        "Saldo atual nas contas",
-        data.accountsTotal,
-        "Banco e carteira; vales ficam somente na aba Vales",
-        data.accountsTotal < 0 ? "expense" : ""
+        /saldo projetado|dinheiro nas contas|saldo atual nas contas|saldo atual da conta/i,
+        "Saldo atual da conta",
+        data.currentBalance,
+        `${money(data.openingBalance)} início + ${money(data.cashIncome)} entradas − ${money(data.cashExpense)} gastos`,
+        data.currentBalance < 0 ? "expense" : ""
       );
 
       removeDuplicateResultCard(page);
