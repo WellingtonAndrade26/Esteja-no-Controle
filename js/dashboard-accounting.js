@@ -59,6 +59,12 @@
     }
   }
 
+  function removeDuplicateResultCard(page) {
+    const card = [...page.querySelectorAll(".premium-mini-card")]
+      .find(item => /resultado do m[eê]s/i.test(item.querySelector("small")?.textContent || ""));
+    if (card) card.remove();
+  }
+
   async function readData() {
     const cloud = window.ENCCloud;
     const client = cloud?.client;
@@ -97,11 +103,6 @@
       .reduce((sum, row) => sum + Number(row.installment_amount || 0), 0);
     const installmentsRemaining = Math.max(0, installmentCommitment - installmentExpenseAlreadyRecorded);
     const accountsTotal = (accRes.data || []).reduce((sum, row) => sum + Number(row.balance || 0), 0);
-
-    // Regra escolhida para o Dashboard:
-    // saldo disponível = saldo informado nas contas - gastos do mês - parcelas ainda não lançadas.
-    // Vales não entram neste cálculo.
-    const availableThisMonth = accountsTotal - cashExpense - installmentsRemaining;
     const monthResult = cashIncome - cashExpense - installmentsRemaining;
 
     return {
@@ -109,7 +110,6 @@
       cashExpense,
       installmentsRemaining,
       accountsTotal,
-      availableThisMonth,
       monthResult
     };
   }
@@ -125,16 +125,15 @@
       if (!data || !page.classList.contains("is-active")) return;
 
       cleanupDashboard(page);
-      const availableClass = data.availableThisMonth < 0 ? "expense" : "income";
       const resultClass = data.monthResult < 0 ? "expense" : "income";
 
       setMetricByLabel(
         page,
-        /saldo dispon[ií]vel/i,
-        "Saldo disponível do mês",
-        data.availableThisMonth,
-        `Em contas: ${money(data.accountsTotal)} · gastos do mês: −${money(data.cashExpense)} · parcelas: −${money(data.installmentsRemaining)}`,
-        availableClass
+        /saldo dispon[ií]vel|resultado do m[eê]s/i,
+        "Resultado do mês",
+        data.monthResult,
+        `${money(data.cashIncome)} entradas − ${money(data.cashExpense)} gastos − ${money(data.installmentsRemaining)} parcelas`,
+        resultClass
       );
 
       setMetricByLabel(
@@ -164,18 +163,7 @@
         data.accountsTotal < 0 ? "expense" : ""
       );
 
-      const resultCard = [...page.querySelectorAll(".premium-mini-card")]
-        .find(item => /resultado do m[eê]s/i.test(item.querySelector("small")?.textContent || ""));
-      if (resultCard) {
-        const strong = resultCard.querySelector("strong");
-        const span = resultCard.querySelector("span:last-child");
-        if (strong) {
-          strong.textContent = money(data.monthResult);
-          strong.classList.remove("income", "expense");
-          strong.classList.add(resultClass);
-        }
-        if (span) span.textContent = "Entradas do mês − gastos do mês − parcelas ainda não lançadas";
-      }
+      removeDuplicateResultCard(page);
     } catch (error) {
       console.error("Falha ao atualizar resumo financeiro do dashboard", error);
     } finally {
