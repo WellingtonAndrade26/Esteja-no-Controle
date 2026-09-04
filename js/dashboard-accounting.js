@@ -74,11 +74,11 @@
     const { start, end } = monthRange();
     const [txRes, instRes, accRes] = await Promise.all([
       client.from("transactions")
-        .select("description,amount,kind,notes,is_installment,source_type")
+        .select("description,amount,kind,notes,is_installment,source_type,source_id")
         .gte("occurred_on", start)
         .lt("occurred_on", end),
       client.from("installments")
-        .select("installment_amount,installments_paid,installments_total"),
+        .select("id,installment_amount,installments_paid,installments_total"),
       client.from("accounts").select("balance")
     ]);
 
@@ -92,17 +92,30 @@
     const cashExpense = txs
       .filter(row => row.kind === "expense")
       .reduce((sum, row) => sum + Number(row.amount || 0), 0);
-    const installmentExpenseAlreadyRecorded = txs
-      .filter(row => row.kind === "expense" && (row.is_installment || row.source_type === "installment"))
+
+    // Pagamentos feitos pelo botão do Planejamento têm source_id da parcela.
+    // Dessa forma cada parcelamento é retirado do compromisso mensal individualmente,
+    // sem abater o pagamento de uma parcela do valor de outra.
+    const paidInstallmentIds = new Set(
+      txs
+        .filter(row => row.kind === "expense" && row.source_type === "installment_payment" && row.source_id)
+        .map(row => String(row.source_id))
+    );
+
+    const legacyInstallmentExpenseAlreadyRecorded = txs
+      .filter(row => row.kind === "expense" && !row.source_id && (row.is_installment || row.source_type === "installment"))
       .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+
     const installmentCommitment = (instRes.data || [])
       .filter(row => Number(row.installments_paid || 0) < Number(row.installments_total || 0))
+      .filter(row => !paidInstallmentIds.has(String(row.id)))
       .reduce((sum, row) => sum + Number(row.installment_amount || 0), 0);
-    const installmentsRemaining = Math.max(0, installmentCommitment - installmentExpenseAlreadyRecorded);
+
+    const installmentsRemaining = Math.max(0, installmentCommitment - legacyInstallmentExpenseAlreadyRecorded);
     const currentBalance = (accRes.data || []).reduce((sum, row) => sum + Number(row.balance || 0), 0);
 
-    // O saldo atual já recebeu as entradas e já perdeu os gastos realizados no mês.
-    // Reconstruímos o saldo do início do mês para apresentar o resultado completo sem duplicar lançamentos.
+    // O saldo atual já recebeu entradas e já perdeu gastos realizados.
+    // Reconstruímos o saldo do início do mês para apresentar o resultado completo.
     const openingBalance = currentBalance - cashIncome + cashExpense;
     const monthResult = openingBalance + cashIncome - cashExpense - installmentsRemaining;
 
@@ -152,7 +165,7 @@
         /sa[ií]das\s*\+\s*parcelas|gastos\s*\+\s*parcelas/i,
         "Gastos + parcelas",
         data.cashExpense + data.installmentsRemaining,
-        `${money(data.cashExpense)} gastos do mês + ${money(data.installmentsRemaining)} parcelas ainda não descontadas`,
+        `${money(data.cashExpense)} gastos já realizados + ${money(data.installmentsRemaining)} parcelas ainda a pagar`,
         "expense"
       );
 
@@ -184,7 +197,7 @@
     }, true);
     document.addEventListener("submit", event => {
       const id = event.target?.id || "";
-      if (["transactionForm", "dashboardBalanceForm", "entityForm"].includes(id)) schedule();
+      if (["transactionForm", "dashboardBalanceForm", "entityForm", "installmentPaymentForm"].includes(id)) schedule();
     }, true);
     window.addEventListener("focus", schedule);
     setInterval(() => sync(false), REFRESH_MS);
