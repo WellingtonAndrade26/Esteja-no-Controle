@@ -74,35 +74,48 @@
     const { start, end } = monthRange();
     const [txRes, instRes, accRes] = await Promise.all([
       client.from("transactions")
-        .select("description,amount,kind,notes,is_installment,source_type,source_id")
+        .select("account_id,description,amount,kind,notes,is_installment,source_type,source_id")
         .gte("occurred_on", start)
         .lt("occurred_on", end),
       client.from("installments")
         .select("id,installment_amount,installments_paid,installments_total"),
-      client.from("accounts").select("balance")
+      client.from("accounts")
+        .select("id,name,institution,type,balance,is_primary,created_at")
+        .order("created_at", { ascending: true })
     ]);
 
     const firstError = [txRes, instRes, accRes].find(r => r?.error)?.error;
     if (firstError) throw firstError;
 
-    const txs = txRes.data || [];
-    const cashIncome = txs
+    const accounts = accRes.data || [];
+    const primaryAccount =
+      accounts.find(row => row.is_primary && row.type !== "investment") ||
+      accounts.find(row => row.is_primary) ||
+      accounts.find(row => row.type !== "investment") ||
+      accounts[0] || null;
+
+    if (!primaryAccount) return null;
+
+    const allTxs = txRes.data || [];
+    const primaryTxs = allTxs.filter(row => String(row.account_id || "") === String(primaryAccount.id));
+
+    const cashIncome = primaryTxs
       .filter(row => row.kind === "income" && !isBenefitIncome(row))
       .reduce((sum, row) => sum + Number(row.amount || 0), 0);
-    const cashExpense = txs
+
+    const cashExpense = primaryTxs
       .filter(row => row.kind === "expense")
       .reduce((sum, row) => sum + Number(row.amount || 0), 0);
 
-    // Pagamentos feitos pelo botão do Planejamento têm source_id da parcela.
-    // Dessa forma cada parcelamento é retirado do compromisso mensal individualmente,
-    // sem abater o pagamento de uma parcela do valor de outra.
+    // Um pagamento feito por qualquer conta já quita a parcela daquele mês.
+    // Porém só movimentações da Conta principal entram nos cards de resultado mensal.
     const paidInstallmentIds = new Set(
-      txs
+      allTxs
         .filter(row => row.kind === "expense" && row.source_type === "installment_payment" && row.source_id)
         .map(row => String(row.source_id))
     );
 
-    const legacyInstallmentExpenseAlreadyRecorded = txs
+    const legacyInstallmentExpenseAlreadyRecorded = primaryTxs
       .filter(row => row.kind === "expense" && !row.source_id && (row.is_installment || row.source_type === "installment"))
       .reduce((sum, row) => sum + Number(row.amount || 0), 0);
 
@@ -112,10 +125,10 @@
       .reduce((sum, row) => sum + Number(row.installment_amount || 0), 0);
 
     const installmentsRemaining = Math.max(0, installmentCommitment - legacyInstallmentExpenseAlreadyRecorded);
-    const currentBalance = (accRes.data || []).reduce((sum, row) => sum + Number(row.balance || 0), 0);
+    const currentBalance = Number(primaryAccount.balance || 0);
 
-    // O saldo atual já recebeu entradas e já perdeu gastos realizados.
-    // Reconstruímos o saldo do início do mês para apresentar o resultado completo.
+    // O resultado mensal pertence somente à Conta principal.
+    // Investimentos e contas secundárias ficam fora deste cálculo.
     const openingBalance = currentBalance - cashIncome + cashExpense;
     const monthResult = openingBalance + cashIncome - cashExpense - installmentsRemaining;
 
@@ -125,7 +138,9 @@
       installmentsRemaining,
       currentBalance,
       openingBalance,
-      monthResult
+      monthResult,
+      primaryAccountName: primaryAccount.name || "Conta principal",
+      primaryInstitution: primaryAccount.institution || ""
     };
   }
 
@@ -141,13 +156,16 @@
 
       cleanupDashboard(page);
       const resultClass = data.monthResult < 0 ? "expense" : "income";
+      const accountLabel = data.primaryInstitution
+        ? `${data.primaryAccountName} · ${data.primaryInstitution}`
+        : data.primaryAccountName;
 
       setMetricByLabel(
         page,
         /saldo dispon[ií]vel|resultado do m[eê]s/i,
         "Resultado do mês",
         data.monthResult,
-        `${money(data.openingBalance)} saldo inicial + ${money(data.cashIncome)} entradas − ${money(data.cashExpense)} gastos − ${money(data.installmentsRemaining)} parcelas`,
+        `${money(data.openingBalance)} saldo inicial + ${money(data.cashIncome)} entradas − ${money(data.cashExpense)} gastos − ${money(data.installmentsRemaining)} parcelas · somente ${accountLabel}`,
         resultClass
       );
 
@@ -156,7 +174,7 @@
         /^entradas(?: em dinheiro)?$/i,
         "Entradas em dinheiro",
         data.cashIncome,
-        "Somente dinheiro livre para contas e gastos",
+        `Somente movimentações da ${accountLabel}`,
         "income"
       );
 
@@ -165,16 +183,16 @@
         /sa[ií]das\s*\+\s*parcelas|gastos\s*\+\s*parcelas/i,
         "Gastos + parcelas",
         data.cashExpense + data.installmentsRemaining,
-        `${money(data.cashExpense)} gastos já realizados + ${money(data.installmentsRemaining)} parcelas ainda a pagar`,
+        `${money(data.cashExpense)} gastos da Conta principal + ${money(data.installmentsRemaining)} parcelas ainda a pagar`,
         "expense"
       );
 
       setMetricByLabel(
         page,
         /saldo projetado|dinheiro nas contas|saldo atual nas contas|saldo atual da conta/i,
-        "Saldo atual da conta",
+        "Saldo atual da conta principal",
         data.currentBalance,
-        `${money(data.openingBalance)} início + ${money(data.cashIncome)} entradas − ${money(data.cashExpense)} gastos`,
+        `${accountLabel} · investimentos e contas secundárias não entram neste saldo`,
         data.currentBalance < 0 ? "expense" : ""
       );
 
