@@ -1,0 +1,4 @@
+project_id = "esteja-no-controle"
+[functions.finance-v2]
+# The handler verifies user JWTs with Auth. Cron has a distinct secret, server-side only.
+verify_jwt = false
