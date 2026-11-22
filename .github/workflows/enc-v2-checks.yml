@@ -1,0 +1,42 @@
+name: Esteja no Controle v2 checks
+
+on:
+  push:
+    branches:
+      - feature/enc-v2.1-auth-hardening
+  pull_request:
+    paths:
+      - 'v2/**'
+      - 'server/**'
+      - 'supabase/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'package*.json'
+      - '.github/workflows/enc-v2-checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Dependencies
+        run: npm ci
+      - name: Financial and authentication tests
+        run: npm test
+      - name: Production build (demo, no secrets)
+        run: npm run build
+      - name: Verify built auth file and service worker
+        run: |
+          test -f dist/auth-flow.js
+          test -f dist/vendor/auth.js
+          grep -q "auth-flow.js" dist/sw.js
