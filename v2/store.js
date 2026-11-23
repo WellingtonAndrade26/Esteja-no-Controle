@@ -3,8 +3,10 @@ import {execute} from './domain/book.js';
 import {demo} from './domain/demo.js';
 import {SandboxProvider} from './open-finance/provider.js';
 import {active} from './open-finance/reconciliation.js';
+import {createAccount,requestRecovery,updatePassword} from './auth-flow.js';
 export const DEMO_KEY='enc-v2-sandbox-2';
-let client, revision=0, state, cloud=false, initialized=false;
+let client, revision=0, state, cloud=false, initialized=false, recovery=false;
+export const passwordRecovery=()=>recovery;
 export const isCloud=()=>cloud;
 export const data=()=>state;
 export const enabled=()=>!!(globalThis.ENC_V2?.url && globalThis.ENC_V2?.key);
@@ -28,14 +30,53 @@ export async function init(){
   if(enabled() && !initialized){
     const {createClient}=await import('./vendor/auth.js');
     client=createClient(globalThis.ENC_V2.url,globalThis.ENC_V2.key,{auth:{storageKey:'enc-v2-auth',persistSession:true,detectSessionInUrl:true}});
-    cloud=!!(await client.auth.getSession()).data.session;initialized=true;
     client.auth.onAuthStateChange((event,session)=>{
-      if(event==='SIGNED_OUT' && cloud){cloud=false;state=blank();setTimeout(()=>location.reload(),0);}
+      if(event==='PASSWORD_RECOVERY'){
+        recovery=true;
+        setTimeout(()=>window.dispatchEvent(new Event('enc-password-recovery')),0);
+      }
+      if(event==='SIGNED_OUT'){
+        const wasCloud=cloud;
+        cloud=false;recovery=false;state=blank();revision=0;
+        if(wasCloud)setTimeout(()=>location.reload(),0);
+      }else if(event==='SIGNED_IN' && !cloud && initialized){
+        // A confirmação do e-mail pode abrir o aplicativo em outra aba.
+        // Nunca exibir os dados do usuário anterior durante a troca de sessão.
+        cloud=true;state=blank();revision=0;
+        setTimeout(async()=>{
+          try{await refresh();window.dispatchEvent(new Event('enc-session-ready'));}
+          catch{window.dispatchEvent(new Event('enc-session-error'));}
+        },0);
+      }
     });
+    const {data,error}=await client.auth.getSession();
+    if(error)throw new Error('Não foi possível restaurar a sessão.');
+    cloud=!!data.session;initialized=true;
   }
   await refresh();
 }
-export async function login(email,password){const {error}=await client.auth.signInWithPassword({email,password});if(error)throw new Error('Falha ao entrar. Confira e-mail e senha.');cloud=true;state=blank();await refresh();}
+export async function login(email,password){
+  if(!client)throw new Error('Login indisponível nesta demonstração.');
+  const {error}=await client.auth.signInWithPassword({email:email.trim(),password});
+  if(error)throw new Error('Falha ao entrar. Confira e-mail e senha.');
+  cloud=true;state=blank();revision=0;await refresh();
+}
+export async function signup(email,password,confirmation){
+  if(!client)throw new Error('Cadastro indisponível nesta demonstração.');
+  const result=await createAccount(client.auth,email,password,confirmation,location.origin+location.pathname);
+  if(result.signedIn){cloud=true;state=blank();revision=0;await refresh();}
+  return result;
+}
+export async function requestReset(email){
+  if(!client)throw new Error('Recuperação indisponível nesta demonstração.');
+  return requestRecovery(client.auth,email,location.origin+location.pathname);
+}
+export async function savePassword(password,confirmation){
+  if(!client)throw new Error('Recuperação indisponível nesta demonstração.');
+  const message=await updatePassword(client.auth,password,confirmation);
+  recovery=false;
+  return message;
+}
 export async function logout(){if(client){const {error}=await client.auth.signOut({scope:'local'});if(error)throw error;}cloud=false;await refresh();}
 export async function dispatch(op,p,id=uid()){
   if(cloud){set(await remote({id,op,p,revision}));return;}

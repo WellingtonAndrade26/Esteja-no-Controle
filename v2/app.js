@@ -19,7 +19,7 @@ function render(){
   document.querySelectorAll('nav a').forEach(a=>{const selected=a.hash==='#'+page();a.classList.toggle('active',selected);if(selected)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
   net();
 }
-function openForm(action,id){ctx=formFor(action,id,store.data());$('#dialog-title').textContent=ctx.title;form.innerHTML=ctx.html;dialog.showModal();form.querySelector('input:not([type="checkbox"]), select,button')?.focus();}
+function openForm(action,id){ctx=formFor(action,id,store.data());$('#dialog-title').textContent=ctx.title;form.innerHTML=ctx.html;if(!dialog.open)dialog.showModal();form.querySelector('input:not([type="checkbox"]), select,button')?.focus();}
 async function reload(){loading=true;net();try{await store.refresh();failed=false;render();}catch(e){failed=true;throw e;}finally{loading=false;net();}}
 function exportData(value={version:2,exportedAt:new Date().toISOString(),...store.data()},prefix='esteja-no-controle'){
  const blob=new Blob([JSON.stringify(value,null,2)],{type:'application/json'});
@@ -60,14 +60,19 @@ document.addEventListener('click',async e=>{
 $('#close').onclick=()=>dialog.close();
 form.onsubmit=async e=>{
  e.preventDefault();if(locked||!ctx)return;
- locked=true;const button=form.querySelector('[type=submit]');button.disabled=true;let p;
+ locked=true;const button=form.querySelector('[type=submit]');button.disabled=true;let p,message='Concluído.';
  try{
    p=payload(form,ctx);
    if(ctx.op==='erase'){if(p.confirmation!=='EXCLUIR')throw new Error('Digite EXCLUIR.');
      await store.erase();}
-   else if(ctx.op==='login')await store.login(p.email,p.password);
+   else if(ctx.op==='login'){await store.login(p.email,p.password);message='Conta conectada.';}
+   else if(ctx.op==='signup'){
+     const result=await store.signup(p.email,p.password,p.confirmation);
+     message=result.signedIn?'Conta criada e conectada.':'Cadastro solicitado. Confira seu e-mail para confirmar a conta.';
+   }else if(ctx.op==='resetRequest')message=await store.requestReset(p.email);
+   else if(ctx.op==='newPassword')message=await store.savePassword(p.password,p.confirmation);
    else await store.dispatch(ctx.op,p,ctx.id);
-   failed=false;dialog.close();ui.response='';render();notice('Concluído.');
+   failed=false;dialog.close();ui.response='';render();notice(message);
  }catch(err){form.querySelector('[role=alert]').textContent=err.message;failed=store.isCloud();}
  finally{locked=false;button.disabled=false;net();}
 };
@@ -82,4 +87,12 @@ if('serviceWorker' in navigator){
  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(controlled)location.reload();controlled=true;});
  navigator.serviceWorker.register('./sw.js').then(r=>registration=r).catch(()=>notice('Instalação offline indisponível.'));
 }
-try{await store.init();render();}catch(e){failed=true;net();content.textContent='Falha ao carregar. Use Atualizar dados para tentar novamente.';notice(e.message);}
+window.addEventListener('enc-password-recovery',()=>{
+  if(store.data() && ctx?.op!=='newPassword')openForm('newPassword');
+});
+window.addEventListener('enc-session-ready',()=>{failed=false;render();});
+window.addEventListener('enc-session-error',()=>{failed=true;net();notice('Não foi possível sincronizar a nova sessão. Atualize os dados.');});
+try{
+  await store.init();render();
+  if(store.passwordRecovery() && ctx?.op!=='newPassword')openForm('newPassword');
+}catch(e){failed=true;net();content.textContent='Falha ao carregar. Use Atualizar dados para tentar novamente.';notice(e.message);}
