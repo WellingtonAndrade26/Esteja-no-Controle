@@ -38,6 +38,12 @@ function show(mode='welcome',message=''){
  root.querySelector('input')?.focus();
 }
 function hide(){root?.remove();root=null;document.body.classList.remove('access-open','access-pending');}
+function emailAuthError(error,fallback){
+ // Preserve privacy: do not reveal whether a given address is registered.
+ if(error?.code==='over_email_send_rate_limit'||error?.status===429)return 'Limite de envio de e-mails atingido no momento. Tente novamente mais tarde.';
+ if(error?.code==='email_address_not_authorized')return 'O serviço de e-mail ainda não está habilitado para este endereço. Contate o suporte do aplicativo.';
+ return fallback;
+}
 async function submit(kind,form){
  const data=new FormData(form),err=form.querySelector('.access-error'),btn=form.querySelector('[type=submit]');
  err.textContent='';btn.disabled=true;
@@ -53,13 +59,13 @@ async function submit(kind,form){
    if(password.length<8)throw new Error('Use uma senha com pelo menos 8 caracteres.');
    if(password!==confirm)throw new Error('As senhas não coincidem.');
    const {data:created,error}=await client.auth.signUp({email,password,options:{emailRedirectTo:location.origin}});
-   if(error)throw new Error('Não foi possível criar a conta. Confira os dados.');
+   if(error)throw new Error(emailAuthError(error,'Não foi possível criar a conta. Confira os dados.'));
    if(created?.session){sessionStorage.removeItem(DEMO_SESSION);removeDemoExit();location.reload();return;}
    show('login','Se for necessário confirmar o cadastro, você receberá um e-mail com as instruções.');return;
   }
   if(kind==='reset'){
    const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
-   if(error)throw new Error('Não foi possível enviar o e-mail de recuperação.');
+   if(error)throw new Error(emailAuthError(error,'Não foi possível enviar o e-mail de recuperação.'));
    show('login','Se o e-mail estiver cadastrado, você receberá as instruções para recuperar o acesso.');
   }
   if(kind==='newPassword'){
