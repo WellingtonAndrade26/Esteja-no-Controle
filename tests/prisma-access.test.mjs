@@ -6,13 +6,15 @@ import vm from 'node:vm';
 
 const source=await readFile(new URL('../prisma/access.js',import.meta.url),'utf8');
 
-function stage(hash='',session=null){
+function stage(hash='',session=null,authErrors={}){
  const events={},bodyClasses=new Set(['access-pending']),sessionValues=new Map();
  let root,authCallback,updatedPassword,replacedUrl,clearedUrl;
  const auth={
    onAuthStateChange(callback){authCallback=callback;return {data:{subscription:{unsubscribe(){}}}};},
    async getSession(){return {data:{session},error:null};},
-   async updateUser({password}){updatedPassword=password;return {error:null};}
+   async updateUser({password}){updatedPassword=password;return {error:null};},
+   async signUp(){return {data:{session:null},error:authErrors.signup||null};},
+   async resetPasswordForEmail(){return {error:authErrors.reset||null};}
  };
  const body={
    classList:{add(k){bodyClasses.add(k);},remove(...ks){for(const k of ks)bodyClasses.delete(k);}},
@@ -36,10 +38,12 @@ function stage(hash='',session=null){
  return {
    events,authEvent:(...args)=>authCallback?.(...args),
    html:()=>root?.innerHTML||'',status:()=>({classes:[...bodyClasses],updatedPassword,replacedUrl,clearedUrl}),
-   form:(mode,values)=>({
-     dataset:{accessForm:mode},values,
-     querySelector(selector){return selector==='.access-error'?{textContent:''}:{disabled:false};}
-   })
+   form:(mode,values)=>{
+     const error={textContent:''}, button={disabled:false};
+     return {dataset:{accessForm:mode},values,error,button,
+       querySelector(selector){return selector==='.access-error'?error:button;}
+     };
+   }
  };
 }
 const tick=()=>new Promise(resolve=>setTimeout(resolve,10));
@@ -85,4 +89,33 @@ test('sem token de recuperação não mostra formulário de alteração de senha
  const page=stage();
  await tick();
  assert.doesNotMatch(page.html(),/data-access-form="newPassword"/);
+});
+
+test('cadastro exibe mensagem útil quando limite de e-mails do Supabase é atingido',async()=>{
+ const page=stage('',null,{signup:{code:'over_email_send_rate_limit',status:429}});
+ await tick();
+ const form=page.form('signup',{email:'teste@example.com',password:'senha-forte-123',confirm:'senha-forte-123'});
+ page.events.submit({target:{closest:()=>form},preventDefault(){}});
+ await tick();
+ assert.match(form.error.textContent,/Limite de envio de e-mails atingido/);
+ assert.equal(form.button.disabled,false);
+});
+
+test('recuperação de senha informa limite de e-mails sem revelar se conta existe',async()=>{
+ const page=stage('',null,{reset:{code:'over_email_send_rate_limit',status:429}});
+ await tick();
+ const form=page.form('reset',{email:'teste@example.com'});
+ page.events.submit({target:{closest:()=>form},preventDefault(){}});
+ await tick();
+ assert.match(form.error.textContent,/Limite de envio de e-mails atingido/);
+ assert.doesNotMatch(form.error.textContent,/teste@example.com/);
+});
+
+test('endereço não autorizado pelo e-mail padrão recebe orientação apropriada',async()=>{
+ const page=stage('',null,{signup:{code:'email_address_not_authorized',status:422}});
+ await tick();
+ const form=page.form('signup',{email:'teste@example.com',password:'senha-forte-123',confirm:'senha-forte-123'});
+ page.events.submit({target:{closest:()=>form},preventDefault(){}});
+ await tick();
+ assert.match(form.error.textContent,/não está habilitado para este endereço/);
 });
