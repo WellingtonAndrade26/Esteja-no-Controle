@@ -678,7 +678,7 @@ async function rpc(name, params) {
 Deno.serve(async (req) => {
   const origin = req.headers.get("Origin"), headers = { "Cache-Control": "no-store", "Content-Type": "application/json", "Vary": "Origin" };
   const respond = (value, status) => new Response(JSON.stringify(value), { headers, status });
-  if (origin && !allowed.has(origin)) return respond({ error: "Origem n\xE3o permitida." }, 403);
+  if (origin && !allowed.has(origin) && !/^https:\/\/[a-z0-9-]+\.esteja-no-controle-prisma\.pages\.dev$/.test(origin)) return respond({ error: "Origem n\xE3o permitida." }, 403);
   if (origin) Object.assign(headers, { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info" });
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
   if (req.method !== "POST") return respond({ error: "M\xE9todo inv\xE1lido." }, 405);
