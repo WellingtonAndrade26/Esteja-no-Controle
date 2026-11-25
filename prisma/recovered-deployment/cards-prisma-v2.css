@@ -1,0 +1,339 @@
+/**
+ * Esteja no Controle — EC Glass 2.2 / Prisma design-system.
+ * Additive override: load AFTER styles.css and cards.css.
+ * Only changes presentation. No finance, Auth or sync logic.
+ */
+:root{
+  --ec-glass-border:rgba(156,231,255,.34);
+  --ec-glass-border-soft:rgba(147,214,244,.23);
+  --ec-glass-inset:rgba(229,251,255,.11);
+  --ec-glass-shadow:0 18px 40px -29px rgba(0,0,0,.94),
+    0 7px 21px -18px rgba(77,196,238,.30),
+    inset 0 1px 0 var(--ec-glass-inset);
+  --ec-glass-panel:radial-gradient(ellipse at 8% -19%,rgba(116,221,242,.12),transparent 49%),
+    linear-gradient(144deg,rgba(27,56,76,.82),rgba(8,26,42,.85) 61%,rgba(18,40,57,.83));
+  --ec-glass-tile:radial-gradient(ellipse at 0 0,rgba(var(--accent-rgb,117,236,255),.17),transparent 53%),
+    linear-gradient(147deg,rgba(45,82,101,.60),rgba(12,34,51,.79) 55%,rgba(28,53,73,.72));
+  --ec-glass-text:#edf9ff;
+  --ec-glass-muted:#b4cddd;
+}
+
+/* Shared, genuinely translucent containers across the entire application. */
+.content .panel,
+.content .hero,
+.content .metric,
+.content .balance,
+.content .panel.card-section,
+.content .panel.stack {
+  min-width:0;
+  isolation:isolate;
+  background:var(--ec-glass-panel);
+  border:1px solid var(--ec-glass-border-soft);
+  border-radius:20px;
+  box-shadow:var(--ec-glass-shadow);
+  -webkit-backdrop-filter:blur(17px) saturate(135%);
+  backdrop-filter:blur(17px) saturate(135%);
+}
+.content .panel.card-section,
+.content .panel.stack {
+  padding:clamp(18px,2vw,27px);
+}
+.content .panel.card-section {
+  display:grid;
+  align-content:start;
+  gap:18px;
+}
+.content .panel.card-section::after {
+  width:min(42%,250px);
+  box-shadow:0 0 18px rgba(var(--accent-rgb,117,236,255),.19);
+}
+.content .card-header {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding-bottom:15px;
+  border-bottom:1px solid rgba(159,222,249,.18);
+}
+.content .card-header h2 {
+  color:var(--ec-glass-text);
+  font-size:clamp(1.05rem,1.5vw,1.24rem);
+  letter-spacing:-.027em;
+}
+.content .card-header p {
+  color:var(--ec-glass-muted);
+  line-height:1.55;
+}
+.content .metric,
+.content .balance {
+  box-shadow:var(--ec-glass-shadow);
+}
+.content .metric {
+  background:
+    radial-gradient(ellipse at 100% 0%,rgba(var(--accent-rgb,117,236,255),.15),transparent 66%),
+    var(--ec-glass-panel);
+}
+.content .metric>.amount,
+.content .balance>.amount,
+.content .object-amount .amount {
+  color:var(--ec-glass-text);
+  font-variant-numeric:tabular-nums;
+  overflow-wrap:anywhere;
+}
+
+/* CRITICAL: the previous CSS removed the first Planning card's glass,
+ * border, background and padding, making it look like a loose list. */
+.content .planning-grid>.panel.card-section:first-child {
+  display:grid;
+  padding:clamp(18px,2vw,27px);
+  background:var(--ec-glass-panel);
+  border:1px solid var(--ec-glass-border);
+  border-radius:20px;
+  box-shadow:var(--ec-glass-shadow);
+  -webkit-backdrop-filter:blur(17px) saturate(135%);
+  backdrop-filter:blur(17px) saturate(135%);
+}
+.content .planning-grid,
+.content .section-pair { gap:20px; align-items:stretch; }
+.content .planning-grid { grid-template-columns:minmax(0,1fr); }
+.content .section-pair {
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,315px),1fr));
+}
+.content .planning-grid>.panel,
+.content .section-pair>.panel { min-width:0; }
+
+/* Every data object is its own independent glass card. */
+.content .card-object,
+.content .limit-card,
+.content .answer-card,
+.content .purchase-sheet {
+  position:relative;
+  min-width:0;
+  overflow:hidden;
+  background:var(--ec-glass-tile);
+  border:1px solid rgba(var(--accent-rgb,117,236,255),.33);
+  border-radius:17px;
+  box-shadow:0 14px 32px -25px #000,
+    inset 0 1px 0 rgba(227,251,255,.13),
+    inset 0 -1px 0 rgba(17,31,45,.28);
+  -webkit-backdrop-filter:blur(12px) saturate(130%);
+  backdrop-filter:blur(12px) saturate(130%);
+}
+.content .card-object:not(.purchase-sheet),
+.content .limit-card { padding:clamp(16px,1.8vw,23px); gap:15px; }
+.content .object-grid { gap:16px; }
+.content .object-head {
+  padding-bottom:12px;
+  border-bottom:1px solid rgba(var(--accent-rgb,117,236,255),.16);
+}
+.content .card-icon.glass-tile {
+  background:linear-gradient(150deg,rgba(var(--accent-rgb,117,236,255),.38),
+    rgba(var(--accent-rgb,117,236,255),.12) 62%,rgba(12,34,50,.80));
+  border:1px solid rgba(var(--accent-rgb,117,236,255),.41);
+  box-shadow:inset 0 1px 0 rgba(233,253,255,.28),0 7px 17px -12px #000;
+}
+.content .object-name h3,
+.content .sheet-head h3 { color:var(--ec-glass-text); }
+.content .card-badge {
+  background:rgba(var(--accent-rgb,117,236,255),.10);
+  border-color:rgba(var(--accent-rgb,117,236,255),.34);
+}
+.content .card-facts {
+  gap:10px;
+  min-width:0;
+}
+.content .card-facts>div,
+.content .card-section>.card-facts>div {
+  min-width:0;
+  padding:12px 13px;
+  border:1px solid rgba(156,222,247,.19);
+  border-radius:12px;
+  background:linear-gradient(145deg,rgba(10,28,43,.71),rgba(36,62,81,.27));
+  box-shadow:inset 0 1px 0 rgba(243,253,255,.045);
+}
+.content .card-facts dt { color:#bad1df; font-size:.75rem; }
+.content .card-facts dd {
+  color:#eef8ff;
+  margin-top:3px;
+  font-size:clamp(.9rem,1.2vw,1.04rem);
+  font-weight:650;
+  font-variant-numeric:tabular-nums;
+}
+.content .card-actions,
+.content .sheet-foot {
+  padding-top:13px;
+  border-top:1px solid rgba(var(--accent-rgb,117,236,255),.19);
+  gap:9px;
+}
+.content .card-object .card-actions {
+  margin-top:auto;
+}
+
+/* Planning details and parcelamento cards — visible, compartmentalized data. */
+.content .planning-grid .plan-totals {
+  display:block;
+  padding:14px;
+  margin:0;
+  border:1px solid rgba(147,211,243,.25);
+  border-radius:14px;
+  background:linear-gradient(130deg,rgba(18,46,65,.72),rgba(12,30,46,.70));
+  box-shadow:inset 0 1px 0 rgba(233,253,255,.08);
+}
+.content .planning-grid .plan-totals summary {
+  cursor:pointer;
+  color:#d8f7ff;
+  font-weight:650;
+  padding:4px 2px;
+  line-height:1.6;
+}
+.content .planning-grid .plan-totals[open] .card-facts {
+  background:transparent;
+  padding:12px 0 0;
+  margin:10px 0 0;
+  border:0;
+  border-top:1px solid rgba(156,225,250,.18);
+  border-radius:0;
+}
+.content .purchase-stack { display:grid; gap:19px; }
+.content .purchase-sheet {
+  padding:clamp(18px,2.4vw,28px);
+  border-color:rgba(142,226,249,.37);
+  background:radial-gradient(ellipse at 0 -20%,rgba(135,231,255,.17),transparent 52%),
+    linear-gradient(142deg,rgba(34,72,93,.69),rgba(11,32,50,.81) 57%,rgba(21,48,67,.76));
+}
+.content .purchase-sheet .card-facts {
+  padding-top:15px;
+  border-top:1px solid rgba(167,236,252,.22);
+  gap:10px;
+}
+.content .purchase-sheet .sheet-head {
+  align-items:flex-start;
+}
+.content .sheet-status {
+  display:inline-flex;
+  padding:6px 10px;
+  border:1px solid rgba(137,233,250,.30);
+  border-radius:99px;
+  background:rgba(37,145,174,.11);
+  font-weight:600;
+}
+.content .purchase-sheet .card-progress {
+  height:8px;
+  border-radius:99px;
+}
+.content .card-progress {
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.4);
+}
+.content .card-empty,
+.content .empty {
+  border:1px dashed rgba(141,213,244,.37);
+  border-radius:14px;
+  padding:18px;
+  background:rgba(11,28,43,.45);
+  line-height:1.6;
+}
+
+/* Movement lists, due dates and invoices read as distinct compact cards. */
+.content .list,
+.content .bill-list { display:grid; gap:11px; }
+.content .list>.row,
+.content .bill-list>li,
+.content .bill-list>li:last-child {
+  min-width:0;
+  padding:13px 15px;
+  border:1px solid rgba(155,218,245,.25);
+  border-radius:14px;
+  background:linear-gradient(128deg,rgba(38,68,85,.55),rgba(10,29,45,.73));
+  box-shadow:inset 0 1px 0 rgba(244,252,255,.08),0 12px 22px -23px #000;
+  -webkit-backdrop-filter:blur(9px);
+  backdrop-filter:blur(9px);
+}
+.content .list>.row:first-child,
+.content .bill-list>li:first-child { border-top:1px solid rgba(155,218,245,.25); }
+.content .bill-list time { background:rgba(15,38,56,.75); }
+.content .quick-prompts button,
+.content .more-nav .nav-link {
+  border:1px solid var(--ec-glass-border-soft);
+  border-radius:14px;
+  background:var(--ec-glass-tile);
+  box-shadow:inset 0 1px 0 rgba(245,253,255,.08);
+}
+.content .section-tabs {
+  border:1px solid rgba(144,218,250,.22);
+  background:rgba(7,23,38,.54);
+}
+
+/* Cues without forcing animation on touch devices. */
+@media (hover:hover) and (prefers-reduced-motion:no-preference){
+  .content .card-object,
+  .content .purchase-sheet,
+  .content .metric,
+  .content .list>.row,
+  .content .bill-list>li {
+    transition:border-color .22s ease,box-shadow .22s ease,transform .22s ease;
+  }
+  .content .card-object:hover,
+  .content .purchase-sheet:hover,
+  .content .metric:hover {
+    transform:translateY(-2px);
+    border-color:rgba(var(--accent-rgb,117,236,255),.55);
+    box-shadow:0 20px 32px -24px #000,inset 0 1px 0 rgba(227,251,255,.18);
+  }
+}
+.content :is(button,a,summary):focus-visible {
+  outline:2px solid #91efff;
+  outline-offset:3px;
+}
+@media (max-width:760px){
+  .content .planning-grid,
+  .content .section-pair { gap:15px; }
+  .content .card-section>.card-facts { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:650px){
+  .content .panel,
+  .content .metric,
+  .content .balance,
+  .content .hero,
+  .content .panel.card-section,
+  .content .panel.stack,
+  .content .planning-grid>.panel.card-section:first-child {
+    padding:16px;
+    border-radius:16px;
+    -webkit-backdrop-filter:blur(9px) saturate(115%);
+    backdrop-filter:blur(9px) saturate(115%);
+  }
+  .content .card-header { gap:10px; padding-bottom:12px; }
+  .content .object-grid,
+  .content .purchase-stack,
+  .content .list,
+  .content .bill-list { gap:12px; }
+  .content .card-object:not(.purchase-sheet),
+  .content .limit-card,
+  .content .purchase-sheet { padding:16px; border-radius:15px; }
+  .content .purchase-sheet .card-facts { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .content .card-facts>div { padding:10px; }
+  .content .sheet-head { gap:8px; }
+  .content .sheet-status { font-size:.71rem; padding:5px 8px; }
+  .content .list>.row,
+  .content .bill-list>li,
+  .content .bill-list>li:last-child { padding:11px 12px; }
+  .content .card-actions .btn,
+  .content .sheet-foot .btn { min-height:42px; }
+}
+@media (max-width:390px){
+  .content .card-facts { gap:7px; }
+  .content .card-facts dd { font-size:.84rem; }
+}
+@supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+  .content .panel,
+  .content .card-object,
+  .content .purchase-sheet,
+  .content .list>.row,
+  .content .bill-list>li { background-color:#12293b; }
+}
+@media print{
+  .content .panel,
+  .content .card-object,
+  .content .purchase-sheet,
+  .content .list>.row,
+  .content .bill-list>li { -webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:none; }
+}
