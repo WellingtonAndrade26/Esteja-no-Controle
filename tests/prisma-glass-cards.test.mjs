@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { transformSync } from 'esbuild';
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const html = read('prisma/recovered-deployment/index.html');
@@ -12,6 +13,11 @@ test('EC Glass stylesheet loads after the original cards CSS', () => {
   assert.equal((html.match(/href="\.\/cards-prisma-v2\.css"/g) || []).length, 1);
   assert.ok(html.indexOf('href="./cards.css"') < html.indexOf('href="./cards-prisma-v2.css"'));
   assert.match(html, /src="\.\/access\.js"/);
+});
+
+test('Glass CSS parses without errors', () => {
+  const compiled = transformSync(css, { loader: 'css', minify: true });
+  assert.ok(compiled.code.includes('planning-grid'));
 });
 
 test('Planning first section restores its independent glass container', () => {
