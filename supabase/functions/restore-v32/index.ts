@@ -112,6 +112,7 @@ Deno.serve(async req=>{
     const raw=await req.text();
     if(raw.length>6000000)return respond({error:'Arquivo excede o limite de tamanho.'},413);
     const body=JSON.parse(raw);
+    if(body?.action==='restore') return respond({error:'Restauração temporariamente bloqueada para homologação de segurança. Use apenas a análise do backup.'},423);
     if(body?.action==='preflight'){
       return respond(await rpc('enc_restore_v32',{p_who:who,p_apply:false}));
     }
